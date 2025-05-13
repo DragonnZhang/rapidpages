@@ -20,6 +20,9 @@ export const env = createEnv({
       ),
 
     OPENAI_API_KEY: z.string(),
+    ANTHROPIC_API_KEY: z.string(),
+    DEEPSEEK_API_KEY: z.string(),
+    MODEL_NAME: z.string().default("deepseek-V3"),
 
     NEXTAUTH_SECRET:
       process.env.NODE_ENV === "production"
@@ -59,6 +62,9 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
 
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+    MODEL_NAME: process.env.MODEL_NAME,
 
     NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,

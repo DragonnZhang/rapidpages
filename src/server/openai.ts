@@ -1,11 +1,8 @@
-import OpenAI from "openai";
 import { env } from "~/env.mjs";
-
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-  baseURL: "https://use.52apikey.cn/v1",
-});
-const openaiModelName = "gpt-4o";
+import { deepseek } from "@ai-sdk/deepseek";
+import { openai, createOpenAI } from "@ai-sdk/openai";
+import { anthropic, createAnthropic } from "@ai-sdk/anthropic";
+import { generateText } from "ai";
 
 const extractFirstCodeBlock = (input: string) => {
   const pattern = /```(\w+)?\n([\s\S]+?)\n```/g;
@@ -21,9 +18,37 @@ const extractFirstCodeBlock = (input: string) => {
   throw new Error("No code block found in input");
 };
 
+// 根据 MODEL_NAME 前缀选择合适的模型
+function getModelByName(modelName: string) {
+  console.log("🚀 ~ getModelByName ~ modelName:", modelName);
+  if (modelName.startsWith("deepseek-")) {
+    return deepseek(modelName);
+  } else if (modelName.startsWith("gpt-")) {
+    return createOpenAI({
+      baseURL: "https://use.52apikey.cn/v1",
+      apiKey: env.OPENAI_API_KEY,
+    })(modelName);
+  } else if (modelName.startsWith("claude-")) {
+    return createOpenAI({
+      baseURL: "https://use.52apikey.cn/v1",
+      apiKey: env.ANTHROPIC_API_KEY,
+    })(modelName);
+  } else {
+    // 默认使用 deepseek 作为后备选项
+    console.warn(`未知模型前缀: ${modelName}，使用 deepseek-chat 作为默认值`);
+    return deepseek("deepseek-chat");
+  }
+}
+
+const model = getModelByName(env.MODEL_NAME);
+
+const options = {
+  maxTokens: 8192,
+};
+
 export async function reviseComponent(prompt: string, code: string) {
-  const completion = await openai.chat.completions.create({
-    model: openaiModelName,
+  const { text } = await generateText({
+    model,
     messages: [
       {
         role: "system",
@@ -49,34 +74,16 @@ export async function reviseComponent(prompt: string, code: string) {
         content: `${prompt}`,
       },
     ],
-    temperature: 0,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-    max_tokens: 4096,
-    n: 1,
+    ...options,
   });
 
-  const choices = completion.choices;
-
-  if (
-    !choices ||
-    choices.length === 0 ||
-    !choices[0] ||
-    !choices[0].message ||
-    !choices[0].message.content
-  ) {
-    throw new Error("No choices returned from OpenAI");
-  }
-
-  const response = choices[0].message.content;
-  console.log("🚀 ~ reviseComponent ~ response:", response);
+  console.log("🚀 ~ reviseComponent ~ response:", text);
 
   let newCode;
   try {
-    newCode = extractFirstCodeBlock(response);
+    newCode = extractFirstCodeBlock(text);
   } catch (error) {
-    newCode = response;
+    newCode = text;
   }
 
   console.log("🚀 ~ reviseComponent ~ newCode:", newCode);
@@ -85,8 +92,8 @@ export async function reviseComponent(prompt: string, code: string) {
 }
 
 export async function generateNewComponent(prompt: string) {
-  const completion = await openai.chat.completions.create({
-    model: openaiModelName,
+  const { text } = await generateText({
+    model,
     messages: [
       {
         role: "system",
@@ -122,23 +129,10 @@ export async function generateNewComponent(prompt: string) {
         ].join("\n"),
       },
     ],
-    temperature: 0,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-    max_tokens: 4096,
-    n: 1,
+    ...options,
   });
 
-  const choices = completion.choices;
+  console.log("🚀 ~ generateNewComponent ~ result:", text);
 
-  if (!choices || choices.length === 0 || !choices[0] || !choices[0].message) {
-    throw new Error("No choices returned from OpenAI");
-  }
-
-  let result = choices[0].message.content || "";
-  console.log("🚀 ~ generateNewComponent ~ result:", result);
-  result = extractFirstCodeBlock(result);
-
-  return result;
+  return extractFirstCodeBlock(text);
 }
