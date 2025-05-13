@@ -62,7 +62,7 @@ export const PageEditor = ({ code }: MyProps) => {
           title="The editor's rendered HTML document"
           srcDoc={dom}
           ref={iframeRef}
-          className="pointer-events-none mx-auto my-0 block w-full min-w-[769] overflow-hidden border-0"
+          className="mx-auto my-0 block w-full min-w-[769] overflow-hidden border-0"
         />
         <div className="pointer-events-none absolute inset-y-0 flex max-w-full">
           <svg
