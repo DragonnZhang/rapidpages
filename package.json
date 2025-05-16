@@ -54,6 +54,7 @@
     "react-resizable-panels": "^0.0.55",
     "superjson": "^1.13.1",
     "tailwind-merge": "^1.14.0",
+    "undici": "^6.21.3",
     "zod": "^3.21.4"
   },
   "devDependencies": {

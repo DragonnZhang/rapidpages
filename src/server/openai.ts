@@ -1,8 +1,10 @@
 import { env } from "~/env.mjs";
 import { deepseek } from "@ai-sdk/deepseek";
-import { openai, createOpenAI } from "@ai-sdk/openai";
-import { anthropic, createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { setGlobalDispatcher, Agent } from "undici";
+
+setGlobalDispatcher(new Agent({ connect: { timeout: 200000_000 } }));
 
 const extractFirstCodeBlock = (input: string) => {
   const pattern = /```(\w+)?\n([\s\S]+?)\n```/g;
@@ -47,7 +49,11 @@ const options = {
 };
 
 export async function reviseComponent(prompt: string, code: string) {
-  const { text } = await generateText({
+  let fullText = "";
+  let finishReason = "";
+
+  // 初始生成
+  const initialResponse = await generateText({
     model,
     messages: [
       {
@@ -56,7 +62,7 @@ export async function reviseComponent(prompt: string, code: string) {
           "你是一位资深的 React 前端开发专家，擅长创建复杂精美的用户界面。",
           "你需要对一个使用 TypeScript 和 Tailwind CSS 的 React 组件进行修改和优化。",
           "请严格遵循用户的需求，一字不差地执行修改要求。",
-          "不要引入新的组件或文件，所有修改都应该在现有组件内完成。",
+          "不要引入新的组件或文件，只导入 React 作为依赖，所有修改都应该在现有组件内完成。",
           "修改时请重点关注以下几点：",
           "1. UI 复杂度：添加更多精美的 UI 元素，使界面更加丰富多样",
           "2. 视觉层次：创建清晰的视觉层次结构和精心设计的布局",
@@ -77,13 +83,44 @@ export async function reviseComponent(prompt: string, code: string) {
     ...options,
   });
 
-  console.log("🚀 ~ reviseComponent ~ response:", text);
+  fullText = initialResponse.text;
+  finishReason = initialResponse.finishReason;
+
+  // 如果因为长度限制而停止，继续生成剩余部分
+  while (finishReason === "length") {
+    console.log("模型因长度限制停止，继续生成剩余部分...");
+
+    const continuationResponse = await generateText({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你是一位资深的 React 前端开发专家，擅长创建复杂精美的用户界面。",
+            "你正在继续生成之前未完成的 React 组件代码。请直接从上次停止的地方继续，保持代码的连贯性。",
+            "不要重复已经生成的部分，只提供缺失的剩余部分。",
+            "回复中只包含代码，不需要额外的解释。",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: `以下是已经生成的部分代码，请继续完成剩余部分：\n\n${fullText}`,
+        },
+      ],
+      ...options,
+    });
+
+    fullText += continuationResponse.text;
+    finishReason = continuationResponse.finishReason;
+  }
+
+  console.log("🚀 ~ reviseComponent ~ response:", fullText);
 
   let newCode;
   try {
-    newCode = extractFirstCodeBlock(text);
+    newCode = extractFirstCodeBlock(fullText);
   } catch (error) {
-    newCode = text;
+    newCode = fullText;
   }
 
   console.log("🚀 ~ reviseComponent ~ newCode:", newCode);
@@ -92,7 +129,11 @@ export async function reviseComponent(prompt: string, code: string) {
 }
 
 export async function generateNewComponent(prompt: string) {
-  const { text } = await generateText({
+  let fullText = "";
+  let finishReason = "";
+
+  // 初始生成
+  const initialResponse = await generateText({
     model,
     messages: [
       {
@@ -132,7 +173,42 @@ export async function generateNewComponent(prompt: string) {
     ...options,
   });
 
-  console.log("🚀 ~ generateNewComponent ~ result:", text);
+  fullText = initialResponse.text;
+  finishReason = initialResponse.finishReason;
 
-  return extractFirstCodeBlock(text);
+  // 如果因为长度限制而停止，继续生成剩余部分
+  while (finishReason === "length") {
+    console.log("模型因长度限制停止，继续生成剩余部分...");
+
+    const continuationResponse = await generateText({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "你是一位专业的前端开发专家，擅长创建功能丰富、交互完善的 React 组件。",
+            "你正在继续生成之前未完成的 React 组件代码。请直接从上次停止的地方继续，保持代码的连贯性。",
+            "不要重复已经生成的部分，只提供缺失的剩余部分。",
+            "回复中只包含代码，不需要额外的解释。",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: `以下是已经生成的部分代码，请继续完成剩余部分：\n\n${fullText}`,
+        },
+      ],
+      ...options,
+    });
+
+    fullText += continuationResponse.text;
+    finishReason = continuationResponse.finishReason;
+  }
+
+  console.log("🚀 ~ generateNewComponent ~ result:", fullText);
+
+  try {
+    return extractFirstCodeBlock(fullText);
+  } catch (error) {
+    return fullText;
+  }
 }
