@@ -7,13 +7,13 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { generateNewComponent, reviseComponent } from "~/server/openai";
+import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 
 export const componentRouter = createTRPCRouter({
   createComponent: protectedProcedure
     .input(z.string())
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      let result = "";
 
       if (input === "") {
         throw new TRPCError({
@@ -22,16 +22,17 @@ export const componentRouter = createTRPCRouter({
         });
       }
 
-      result = await generateNewComponent(input);
+      // 现在返回ComponentFile[]格式
+      const result = await generateNewComponent(input);
 
       const component = await ctx.db.component.create({
         data: {
-          code: result,
+          code: JSON.stringify(result), // 直接存储ComponentFile[]格式
           authorId: userId,
           prompt: input,
           revisions: {
             create: {
-              code: result,
+              code: JSON.stringify(result), // 同样存储ComponentFile[]格式
               prompt: input,
             },
           },
@@ -78,11 +79,15 @@ export const componentRouter = createTRPCRouter({
         });
       }
 
-      const result = await reviseComponent(input.prompt, baseRevision.code);
+      // 确保baseRevision.code是ComponentFile[]格式
+      const codeFiles = parseCodeToComponentFiles(baseRevision.code);
+
+      // 调用修改函数，传入ComponentFile[]格式
+      const result = await reviseComponent(input.prompt, codeFiles);
 
       const newRevision = await ctx.db.componentRevision.create({
         data: {
-          code: result,
+          code: JSON.stringify(result), // 存储ComponentFile[]格式
           prompt: input.prompt,
           componentId: baseRevision.componentId,
         },
@@ -93,7 +98,7 @@ export const componentRouter = createTRPCRouter({
           id: baseRevision.componentId,
         },
         data: {
-          code: result,
+          code: JSON.stringify(result), // 存储ComponentFile[]格式
           prompt: input.prompt,
           revisions: {
             connect: {
@@ -158,7 +163,10 @@ export const componentRouter = createTRPCRouter({
         .filter(function <T>(rev: T): rev is NonNullable<T> {
           return rev !== undefined;
         })
-        .map(({ code, prompt }) => ({ code, prompt }));
+        .map(({ code, prompt }) => ({
+          code: parseCodeToComponentFiles(code), // 确保是ComponentFile[]格式
+          prompt,
+        }));
 
       if (revisions.length < 1) {
         throw new TRPCError({
@@ -182,11 +190,14 @@ export const componentRouter = createTRPCRouter({
 
       const newComponent = await ctx.db.component.create({
         data: {
-          code: revisions[0]!.code,
+          code: JSON.stringify(revisions[0]!.code), // 存储ComponentFile[]格式
           authorId: userId,
           prompt: revisions[0]!.prompt,
           revisions: {
-            create: revisions,
+            create: revisions.map((revision) => ({
+              ...revision,
+              code: JSON.stringify(revision.code),
+            })),
           },
         },
         include: {
@@ -318,16 +329,11 @@ export const componentRouter = createTRPCRouter({
 
 /**
  * componentImportRouter allows to create a component from arbitrary code blocks.
- * In most cases this would be a priviledged endpoint that only admins can use.
- *
- * @todo Expose this via API (public or private TBD)
- * and perhaps implement ad-hoc procedure rather than use protectedProcedure.
  */
 export const componentImportRouter = createTRPCRouter({
   importComponent: protectedProcedure
     .input(
       z.object({
-        /* @todo set max length ? */
         code: z.string(),
         description: z.string(),
       }),
@@ -344,15 +350,24 @@ export const componentImportRouter = createTRPCRouter({
         });
       }
 
+      // 转换导入的代码为ComponentFile[]格式
+      const codeFiles = [
+        {
+          filename: "Section.tsx",
+          content: input.code,
+          isMain: true,
+        },
+      ];
+
       const component = await ctx.db.component.create({
         data: {
-          code,
+          code: codeFiles, // 存储为ComponentFile[]格式
           authorId: null,
-          prompt: description,
+          prompt: input.description,
           revisions: {
             create: {
-              code,
-              prompt: description,
+              code: codeFiles, // 同样存储为ComponentFile[]格式
+              prompt: input.description,
             },
           },
         },

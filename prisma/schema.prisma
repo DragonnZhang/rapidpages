@@ -62,7 +62,7 @@ enum ComponentVisibility {
 
 model Component {
     id     String @id @default(cuid())
-    code   String
+    code   Json       @default("[]") // 修改为Json类型
     prompt String
 
     author   User?   @relation(fields: [authorId], references: [id])
@@ -78,7 +78,7 @@ model Component {
 
 model ComponentRevision {
     id     String @id @default(cuid())
-    code   String
+    code   Json       @default("[]") // 修改为Json类型
     prompt String
 
     component   Component @relation(fields: [componentId], references: [id], onDelete: Cascade)

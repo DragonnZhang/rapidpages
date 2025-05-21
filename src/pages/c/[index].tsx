@@ -13,6 +13,8 @@ import type {
 import { type NextPageWithLayout } from "~/pages/_app";
 import { ssgHelper } from "~/utils/ssg";
 import { useSession } from "next-auth/react";
+import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
+import { type ComponentFile } from "~/utils/compiler";
 
 const ComponentPage: NextPageWithLayout<
   InferGetServerSidePropsType<typeof getServerSideProps>
@@ -21,6 +23,9 @@ const ComponentPage: NextPageWithLayout<
   // Find the last revision and return it's id
   const lastRevisionId =
     component.revisions[component.revisions.length - 1]!.id;
+
+  // 转换代码格式
+  const codeFiles: ComponentFile[] = parseCodeToComponentFiles(component.code);
 
   return (
     <>
@@ -39,7 +44,7 @@ const ComponentPage: NextPageWithLayout<
                 minSize={30}
                 className="flex h-full flex-col pr-3"
               >
-                <EditorTabs code={component.code} revisionId={lastRevisionId} />
+                <EditorTabs code={codeFiles} revisionId={lastRevisionId} />
                 {session && session.user.id === component.authorId && (
                   <Chat revisionId={lastRevisionId} />
                 )}

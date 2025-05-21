@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { compileTypescript } from "~/utils/compiler";
+import { compileTypescript, type ComponentFile } from "~/utils/compiler";
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
-  code: string;
+  code: ComponentFile[];
 }
 
 export const PageEditor = ({ code }: MyProps) => {

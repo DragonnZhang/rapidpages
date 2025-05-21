@@ -16,12 +16,13 @@ import toast from "react-hot-toast";
 import { env } from "~/env.mjs";
 import router from "next/router";
 import { api } from "~/utils/api";
+import { type ComponentFile } from "~/utils/compiler";
 
 export const EditorTabs = ({
   code,
   revisionId,
 }: {
-  code: string;
+  code: ComponentFile[];
   revisionId: string;
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
