@@ -60,11 +60,6 @@ const extractMultipleCodeBlocks = (input: string): ComponentFile[] | null => {
     return null;
   }
 
-  // 确保至少有一个文件被标记为主文件
-  if (!files.some((f) => f.isMain)) {
-    files[0]!.isMain = true;
-  }
-
   return files;
 };
 
@@ -99,6 +94,7 @@ export async function reviseComponent(
           "你需要对一个使用 TypeScript 和 Tailwind CSS 的 React 组件进行修改和优化。",
           "请严格遵循用户的需求，一字不差地执行修改要求。",
           "这是一个多文件组件项目，你需要分别修改每个文件，确保文件间引用关系正确。",
+          "为了节省 token，请只返回你修改过的文件，未修改的文件不需要返回。",
           "修改时请重点关注以下几点：",
           "1. UI 复杂度：添加更多精美的 UI 元素，使界面更加丰富多样",
           "2. 视觉层次：创建清晰的视觉层次结构和精心设计的布局",
@@ -106,10 +102,11 @@ export async function reviseComponent(
           "4. 交互丰富：增加更多的交互元素和用户反馈",
           "5. 功能完整：确保实现所有必要的界面功能",
           "首先逐步思考需要的修改，然后提供一个具有高度复杂性和视觉吸引力的完整实现。",
-          "对于每个文件，请使用 ```tsx // 文件: 文件名.tsx (主文件) 的格式包裹代码，主文件标记只用于主组件文件。",
+          "对于每个修改过的文件，请使用 ```tsx // 文件: 文件名.tsx (主文件) 的格式包裹代码，主文件标记只用于主组件文件。",
+          "如果创建了新文件，请用相同格式，并确保文件名不与已有文件冲突。",
           "修改后的代码应该是可以直接使用的完整 React 组件。",
-          "回复中只包含代码，不需要额外的解释。",
-          `以下是需要修改的当前代码：\n${codeDisplay}`,
+          "回复中只包含修改过的文件代码，不需要额外的解释。",
+          `以下是当前组件代码，请分析需求后返回修改过的文件：\n${codeDisplay}`,
         ].join("\n"),
       },
       {
@@ -137,6 +134,7 @@ export async function reviseComponent(
             "你需要对一个使用 TypeScript 和 Tailwind CSS 的 React 组件进行修改和优化。",
             "请严格遵循用户的需求，一字不差地执行修改要求。",
             "这是一个多文件组件项目，你需要分别修改每个文件，确保文件间引用关系正确。",
+            "为了节省 token，请只返回你修改过的文件，未修改的文件不需要返回。",
             "修改时请重点关注以下几点：",
             "1. UI 复杂度：添加更多精美的 UI 元素，使界面更加丰富多样",
             "2. 视觉层次：创建清晰的视觉层次结构和精心设计的布局",
@@ -144,10 +142,10 @@ export async function reviseComponent(
             "4. 交互丰富：增加更多的交互元素和用户反馈",
             "5. 功能完整：确保实现所有必要的界面功能",
             "首先逐步思考需要的修改，然后提供一个具有高度复杂性和视觉吸引力的完整实现。",
-            "对于每个文件，请使用 ```tsx // 文件: 文件名.tsx (主文件) 的格式包裹代码，主文件标记只用于主组件文件。",
+            "对于每个修改过的文件，请使用 ```tsx // 文件: 文件名.tsx (主文件) 的格式包裹代码，主文件标记只用于主组件文件。",
+            "如果创建了新文件，请用相同格式，并确保文件名不与已有文件冲突。",
             "修改后的代码应该是可以直接使用的完整 React 组件。",
-            "回复中只包含代码，不需要额外的解释。",
-            `以下是需要修改的当前代码：\n${codeDisplay}`,
+            "回复中只包含修改过的文件代码，不需要额外的解释。",
           ].join("\n"),
         },
         {
@@ -186,7 +184,46 @@ export async function reviseComponent(
   }
 
   console.log("🚀 ~ reviseComponent ~ 成功提取多文件组件:", multiFiles.length);
-  return multiFiles;
+
+  // 合并修改后的文件到原始文件集中
+  const updatedFiles = mergeUpdatedFiles(code, multiFiles);
+
+  return updatedFiles;
+}
+
+/**
+ * 合并修改后的文件到原始文件集中
+ * @param originalFiles 原始文件集
+ * @param modifiedFiles 修改后的文件
+ * @returns 合并后的文件集
+ */
+function mergeUpdatedFiles(
+  originalFiles: ComponentFile[],
+  modifiedFiles: ComponentFile[],
+): ComponentFile[] {
+  // 创建原始文件的副本
+  const result = [...originalFiles];
+
+  // 创建文件名到索引的映射，便于快速查找
+  const fileMap = new Map<string, number>();
+  originalFiles.forEach((file, index) => {
+    fileMap.set(file.filename, index);
+  });
+
+  // 处理每个修改后的文件
+  modifiedFiles.forEach((modifiedFile) => {
+    const index = fileMap.get(modifiedFile.filename);
+
+    if (index !== undefined) {
+      // 文件已存在，更新它
+      result[index] = modifiedFile;
+    } else {
+      // 文件不存在，这是个新文件，添加到结果中
+      result.push(modifiedFile);
+    }
+  });
+
+  return result;
 }
 
 export async function generateNewComponent(
