@@ -137,17 +137,9 @@ export const PageEditor = ({ code }: MyProps) => {
       disableElementSelection();
     };
 
-    // 取消选择（ESC键）
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        disableElementSelection();
-      }
-    };
-
     overlay.addEventListener("mousemove", handleMouseMove);
     overlay.addEventListener("mouseleave", handleMouseLeave);
     overlay.addEventListener("click", handleClick);
-    iframeDoc.addEventListener("keydown", handleKeyDown);
 
     // 清理函数
     const cleanup = () => {
@@ -156,7 +148,6 @@ export const PageEditor = ({ code }: MyProps) => {
       }
       overlay.remove();
       style.remove();
-      iframeDoc.removeEventListener("keydown", handleKeyDown);
     };
 
     // 保存清理函数到iframe上，方便后续调用
@@ -178,8 +169,6 @@ export const PageEditor = ({ code }: MyProps) => {
   // 选择元素
   const selectElement = (element: HTMLElement) => {
     const tagName = element.tagName.toLowerCase();
-    const className = element.className ? ` class="${element.className}"` : "";
-    const id = element.id ? ` id="${element.id}"` : "";
 
     // 简化元素名称，只显示标签类型
     const elementName = `<${tagName}>`;
