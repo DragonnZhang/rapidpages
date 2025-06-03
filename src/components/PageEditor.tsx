@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { compileTypescript, type ComponentFile } from "~/utils/compiler";
-import { CursorArrowRaysIcon } from "@heroicons/react/24/outline";
+import { CursorArrowRaysIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { ActionHistoryPanel } from "./ActionHistoryPanel";
+import { type ActionRecord } from "~/types/multimodal";
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
   code: ComponentFile[];
@@ -15,6 +17,123 @@ export const PageEditor = ({ code }: MyProps) => {
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
     null,
   );
+  const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
+  const [showActionHistory, setShowActionHistory] = useState(false);
+
+  // 添加操作记录
+  const addActionRecord = (
+    type: "click" | "rightclick" | "doubleclick",
+    element: HTMLElement,
+  ) => {
+    const tagName = element.tagName.toLowerCase();
+    const elementText = element.textContent?.trim().substring(0, 50) || "";
+    const elementClass = element.className || "";
+    const elementId = element.id || "";
+
+    let description = `${
+      type === "rightclick"
+        ? "右键点击"
+        : type === "doubleclick"
+        ? "双击"
+        : "点击"
+    } <${tagName}>`;
+
+    if (elementId) {
+      description += ` (id: ${elementId})`;
+    } else if (elementClass) {
+      description += ` (class: ${elementClass.split(" ")[0]})`;
+    }
+
+    if (elementText) {
+      description += ` - "${elementText}"`;
+    }
+
+    const record: ActionRecord = {
+      id: Math.random().toString(36).substring(2, 15),
+      timestamp: Date.now(),
+      type,
+      elementTag: tagName,
+      elementText,
+      elementClass,
+      elementId,
+      description,
+    };
+
+    console.log("🚀 ~ addActionRecord ~ record:", record); // 添加调试日志
+    setActionHistory((prev) => [record, ...prev].slice(0, 50)); // 保持最近50条记录
+  };
+
+  // 添加iframe事件监听器
+  const addIframeEventListeners = () => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentDocument) {
+      console.log("🚀 ~ iframe contentDocument not ready"); // 调试日志
+      return null;
+    }
+
+    const iframeDoc = iframe.contentDocument;
+    console.log("🚀 ~ Adding iframe event listeners"); // 调试日志
+
+    // 点击事件
+    const handleIframeClick = (e: MouseEvent) => {
+      console.log("🚀 ~ iframe click detected", e.target); // 调试日志
+      if (isElementSelectMode) return; // 选择模式下不记录
+
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        target !== iframeDoc.body &&
+        target !== iframeDoc.documentElement
+      ) {
+        addActionRecord("click", target);
+      }
+    };
+
+    // 右键点击事件
+    const handleIframeContextMenu = (e: MouseEvent) => {
+      console.log("🚀 ~ iframe contextmenu detected", e.target); // 调试日志
+      if (isElementSelectMode) return; // 选择模式下不记录
+
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        target !== iframeDoc.body &&
+        target !== iframeDoc.documentElement
+      ) {
+        addActionRecord("rightclick", target);
+      }
+    };
+
+    // 双击事件
+    const handleIframeDoubleClick = (e: MouseEvent) => {
+      console.log("🚀 ~ iframe dblclick detected", e.target); // 调试日志
+      if (isElementSelectMode) return; // 选择模式下不记录
+
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        target !== iframeDoc.body &&
+        target !== iframeDoc.documentElement
+      ) {
+        addActionRecord("doubleclick", target);
+      }
+    };
+
+    iframeDoc.addEventListener("click", handleIframeClick, true); // 使用捕获阶段
+    iframeDoc.addEventListener("contextmenu", handleIframeContextMenu, true);
+    iframeDoc.addEventListener("dblclick", handleIframeDoubleClick, true);
+
+    return () => {
+      console.log("🚀 ~ Removing iframe event listeners"); // 调试日志
+      iframeDoc.removeEventListener("click", handleIframeClick, true);
+      iframeDoc.removeEventListener(
+        "contextmenu",
+        handleIframeContextMenu,
+        true,
+      );
+      iframeDoc.removeEventListener("dblclick", handleIframeDoubleClick, true);
+    };
+  };
 
   useEffect(() => {
     // Compile and render the page
@@ -45,6 +164,43 @@ export const PageEditor = ({ code }: MyProps) => {
       window.removeEventListener("resize", handleResize);
     };
   }, [code]);
+
+  // 单独的useEffect来处理iframe事件监听器
+  useEffect(() => {
+    if (!dom) return; // 确保DOM已编译完成
+
+    let cleanup: (() => void) | null = null;
+
+    // 使用多次尝试来确保iframe完全加载
+    const attempts = [500, 1000, 2000, 3000]; // 多个时间点尝试
+    const timeouts: NodeJS.Timeout[] = [];
+
+    attempts.forEach((delay) => {
+      const timeout = setTimeout(() => {
+        if (!cleanup) {
+          // 只在还没有成功添加监听器时尝试
+          cleanup = addIframeEventListeners();
+          if (cleanup) {
+            console.log(
+              "🚀 ~ Successfully added iframe event listeners after",
+              delay,
+              "ms",
+            );
+          }
+        }
+      }, delay);
+      timeouts.push(timeout);
+    });
+
+    return () => {
+      // 清理所有定时器
+      timeouts.forEach(clearTimeout);
+      // 清理事件监听器
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [dom, isElementSelectMode]); // 依赖dom和选择模式状态
 
   // 启用元素选择模式
   const enableElementSelection = () => {
@@ -194,8 +350,26 @@ export const PageEditor = ({ code }: MyProps) => {
 
   return (
     <div className="absolute inset-0 flex justify-center">
-      {/* 元素选择按钮 */}
-      <div className="absolute right-4 top-4 z-10">
+      {/* 操作按钮组 */}
+      <div className="absolute right-4 top-4 z-10 flex space-x-2">
+        {/* 历史记录按钮 */}
+        <button
+          onClick={() => setShowActionHistory(!showActionHistory)}
+          className={`
+            inline-flex items-center rounded-md px-3 py-2 text-sm font-medium shadow-sm
+            ${
+              showActionHistory
+                ? "bg-gray-600 text-white hover:bg-gray-700"
+                : "bg-gray-500 text-white hover:bg-gray-600"
+            }
+          `}
+          title={`${showActionHistory ? "隐藏" : "显示"}操作历史记录`}
+        >
+          <ClockIcon className="mr-1 h-4 w-4" />
+          历史 ({actionHistory.length})
+        </button>
+
+        {/* 元素选择按钮 */}
         <button
           onClick={
             isElementSelectMode
@@ -216,6 +390,15 @@ export const PageEditor = ({ code }: MyProps) => {
           {isElementSelectMode ? "取消选择" : "选择元素"}
         </button>
       </div>
+
+      {/* 操作历史面板 */}
+      {showActionHistory && (
+        <ActionHistoryPanel
+          actions={actionHistory}
+          onClose={() => setShowActionHistory(false)}
+          onClear={() => setActionHistory([])}
+        />
+      )}
 
       <div
         className="absolute inset-0 overflow-hidden rounded-b-lg"

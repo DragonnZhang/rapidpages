@@ -66,7 +66,7 @@ const extractMultipleCodeBlocks = (input: string): ComponentFile[] | null => {
 interface MediaItem {
   url: string;
   name: string;
-  type: "image" | "audio" | "code" | "element"; // 添加 element 类型
+  type: "image" | "audio" | "code" | "element" | "action"; // 添加 action 类型
 }
 
 export async function reviseComponent(
@@ -99,7 +99,9 @@ export async function reviseComponent(
           ? "音频文件"
           : mediaItem.type === "code"
           ? "代码文件"
-          : "页面元素";
+          : mediaItem.type === "element"
+          ? "页面元素"
+          : "用户操作记录";
       mediaContext += `${index + 1}. ${fileType} "${mediaItem.name}": ${
         mediaItem.url
       }\n`;
@@ -169,6 +171,11 @@ export async function reviseComponent(
         userContentParts.push({
           type: "text",
           text: `这是一个页面元素作为参考：${mediaItem.name}\n\`\`\`html\n${mediaItem.url}\n\`\`\``,
+        });
+      } else if (mediaItem.type === "action") {
+        userContentParts.push({
+          type: "text",
+          text: `这是用户的操作记录作为参考：${mediaItem.name}\n用户操作：${mediaItem.url}`,
         });
       }
     });
@@ -315,7 +322,9 @@ export async function generateNewComponent(
           ? "音频文件"
           : mediaItem.type === "code"
           ? "代码文件"
-          : "页面元素";
+          : mediaItem.type === "element"
+          ? "页面元素"
+          : "用户操作记录";
       mediaContext += `${index + 1}. ${fileType} "${mediaItem.name}": ${
         mediaItem.url
       }\n`;
@@ -400,6 +409,11 @@ export async function generateNewComponent(
         userContentParts.push({
           type: "text",
           text: `这是一个页面元素作为参考：${mediaItem.name}\n\`\`\`html\n${mediaItem.url}\n\`\`\``,
+        });
+      } else if (mediaItem.type === "action") {
+        userContentParts.push({
+          type: "text",
+          text: `这是用户的操作记录作为参考：${mediaItem.name}\n用户操作：${mediaItem.url}`,
         });
       }
     });

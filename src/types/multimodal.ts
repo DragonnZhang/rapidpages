@@ -1,6 +1,6 @@
 export interface MediaItem {
   id: string;
-  type: "image" | "audio" | "code" | "element";
+  type: "image" | "audio" | "code" | "element" | "action";
   url: string; // 对于element类型，这里存储元素的HTML内容
   name: string;
   size?: number;
@@ -9,4 +9,15 @@ export interface MediaItem {
 export interface RichTextContent {
   text: string;
   media: MediaItem[];
+}
+
+export interface ActionRecord {
+  id: string;
+  timestamp: number;
+  type: "click" | "rightclick" | "doubleclick";
+  elementTag: string;
+  elementText?: string;
+  elementClass?: string;
+  elementId?: string;
+  description: string;
 }

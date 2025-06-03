@@ -6,6 +6,7 @@ import {
   XMarkIcon,
   CodeBracketIcon,
   CursorArrowRaysIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "~/utils/utils";
 import { type RichTextContent, type MediaItem } from "~/types/multimodal";
@@ -25,7 +26,7 @@ interface RichTextInputProps {
 interface MediaBadge {
   id: string;
   filename: string;
-  type: "image" | "audio" | "code" | "element";
+  type: "image" | "audio" | "code" | "element" | "action";
   position: number;
 }
 
@@ -368,6 +369,102 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     };
   }, [handleCodeFileDrop, handleElementDrop]);
 
+  // 处理操作记录
+  const handleActionDrop = useCallback(
+    (actionData: { type: string; name: string; content: string }) => {
+      const mediaItem: MediaItem = {
+        id: generateId(),
+        type: "action",
+        url: actionData.content, // 存储操作描述
+        name: actionData.name,
+        size: actionData.content.length,
+      };
+
+      setMedia((prev) => [...prev, mediaItem]);
+
+      // 在当前光标位置插入操作标记
+      const displayName =
+        actionData.name.length > 20
+          ? actionData.name.substring(0, 17) + "..."
+          : actionData.name;
+      const placeholder = `[${displayName}]`;
+
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newText =
+          currentText.substring(0, start) +
+          placeholder +
+          currentText.substring(end);
+
+        setCurrentText(newText);
+
+        // 创建badge
+        const newBadge: MediaBadge = {
+          id: mediaItem.id,
+          filename: actionData.name,
+          type: "action",
+          position: start,
+        };
+
+        setMediaBadges((prev) => [...prev, newBadge]);
+
+        // 设置新的光标位置
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd =
+            start + placeholder.length;
+          setCursorPosition(start + placeholder.length);
+        }, 0);
+      }
+
+      return mediaItem;
+    },
+    [currentText],
+  );
+
+  // 监听操作记录事件
+  useEffect(() => {
+    const handleActionSelection = (event: CustomEvent) => {
+      handleActionDrop(event.detail);
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const data = e.dataTransfer?.getData("application/json");
+      if (data) {
+        try {
+          const dragData = JSON.parse(data);
+          if (dragData.type === "action") {
+            handleActionDrop(dragData);
+          }
+        } catch (error) {
+          console.error("Failed to parse drag data:", error);
+        }
+      }
+    };
+
+    window.addEventListener(
+      "actionDrop",
+      handleActionSelection as EventListener,
+    );
+    containerRef.current?.addEventListener("dragover", handleDragOver);
+    containerRef.current?.addEventListener("drop", handleDrop);
+
+    return () => {
+      window.removeEventListener(
+        "actionDrop",
+        handleActionSelection as EventListener,
+      );
+      containerRef.current?.removeEventListener("dragover", handleDragOver);
+      containerRef.current?.removeEventListener("drop", handleDrop);
+    };
+  }, [handleCodeFileDrop, handleElementDrop, handleActionDrop]);
+
   // 渲染带有badge的文本
   const renderTextWithBadges = () => {
     if (!currentText) return null;
@@ -412,6 +509,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return <CodeBracketIcon className="h-3 w-3" />;
             case "element":
               return <CursorArrowRaysIcon className="h-3 w-3" />;
+            case "action":
+              return <ClockIcon className="h-3 w-3" />;
             default:
               return <PhotoIcon className="h-3 w-3" />;
           }
@@ -427,6 +526,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return "border border-purple-200 bg-purple-100 text-purple-800";
             case "element":
               return "border border-orange-200 bg-orange-100 text-orange-800";
+            case "action":
+              return "border border-yellow-200 bg-yellow-100 text-yellow-800";
             default:
               return "border border-blue-200 bg-blue-100 text-blue-800";
           }
