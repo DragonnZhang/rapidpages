@@ -176,7 +176,7 @@ export const compileTypescript = async (files: ComponentFile[]) => {
   });
 
   // 获取打包后的代码
-  const bundledCode = bundleResult.outputFiles[0].text;
+  const bundledCode = bundleResult.outputFiles[0]!.text;
 
   // 使用 babel 编译打包后的代码
   const output = babelCompile(bundledCode, "bundle.js");

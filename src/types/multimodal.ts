@@ -1,6 +1,6 @@
 export interface MediaItem {
   id: string;
-  type: "image" | "audio";
+  type: "image" | "audio" | "code";
   url: string;
   name: string;
   size?: number;
@@ -10,10 +10,4 @@ export interface MediaItem {
 export interface RichTextContent {
   text: string;
   media: MediaItem[];
-}
-
-export interface RichTextSegment {
-  type: "text" | "media";
-  content: string; // 文本内容或媒体ID
-  mediaItem?: MediaItem;
 }
