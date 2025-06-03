@@ -9,31 +9,38 @@ import {
 import { generateNewComponent, reviseComponent } from "~/server/openai";
 import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 
+// 定义媒体对象的Zod schema
+const MediaItemSchema = z.object({
+  url: z.string(),
+  name: z.string(),
+  type: z.enum(["image", "audio", "code"]), // 添加 code 类型
+});
+
 export const componentRouter = createTRPCRouter({
   createComponent: protectedProcedure
-    .input(z.string())
+    .input(
+      z.object({
+        prompt: z.string(),
+        media: z.array(MediaItemSchema).optional(), // 可选的媒体对象数组
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      if (input === "") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Prompt cannot be empty",
-        });
-      }
+      console.log("🚀 ~ createComponent input:", input);
 
-      // 现在返回ComponentFile[]格式
-      const result = await generateNewComponent(input);
+      // 传递媒体对象给生成函数
+      const result = await generateNewComponent(input.prompt, input.media);
 
       const component = await ctx.db.component.create({
         data: {
           code: JSON.stringify(result), // 直接存储ComponentFile[]格式
           authorId: userId,
-          prompt: input,
+          prompt: input.prompt,
           revisions: {
             create: {
               code: JSON.stringify(result), // 同样存储ComponentFile[]格式
-              prompt: input,
+              prompt: input.prompt,
             },
           },
         },
@@ -58,10 +65,13 @@ export const componentRouter = createTRPCRouter({
       z.object({
         revisionId: z.string(),
         prompt: z.string(),
+        media: z.array(MediaItemSchema).optional(), // 可选的媒体对象数组
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
+
+      console.log("🚀 ~ makeRevision input:", input);
 
       const baseRevision = await ctx.db.componentRevision.findFirst({
         where: {
@@ -82,8 +92,12 @@ export const componentRouter = createTRPCRouter({
       // 确保baseRevision.code是ComponentFile[]格式
       const codeFiles = parseCodeToComponentFiles(baseRevision.code);
 
-      // 调用修改函数，传入ComponentFile[]格式
-      const result = await reviseComponent(input.prompt, codeFiles);
+      // 调用修改函数，传入ComponentFile[]格式和媒体对象
+      const result = await reviseComponent(
+        input.prompt,
+        codeFiles,
+        input.media,
+      );
 
       const newRevision = await ctx.db.componentRevision.create({
         data: {

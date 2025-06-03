@@ -13,6 +13,8 @@ import { api } from "~/utils/api";
 import toast from "react-hot-toast";
 import router from "next/router";
 import { type NextPageWithLayout } from "./_app";
+import { RichTextInput } from "~/components/RichTextInput";
+import { type RichTextContent } from "~/types/multimodal";
 
 const items = [
   {
@@ -52,15 +54,12 @@ const loadingItems = [
 
 const NewPage: NextPageWithLayout = () => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [input, setInput] = useState<string>("");
-
   const generateComponent = api.component.createComponent.useMutation();
   const { data: session } = useSession();
   const randomItem =
     loadingItems[Math.floor(Math.random() * loadingItems.length)]!;
 
-  const handleGenerateComponent = async (prompt: string) => {
+  const handleGenerateComponent = async (content: RichTextContent) => {
     if (!session) {
       return router.push("/login");
     }
@@ -71,7 +70,14 @@ const NewPage: NextPageWithLayout = () => {
     setIsGenerating(true);
 
     try {
-      const result = await generateComponent.mutateAsync(prompt);
+      console.log("🚀 ~ handleGenerateComponent content:", content);
+
+      const result = await generateComponent.mutateAsync({
+        prompt: content.text,
+        media: content.media,
+      });
+
+      console.log("🚀 ~ handleGenerateComponent result:", result);
 
       if (result.status === "error") {
         throw new Error("Failed to generate component");
@@ -80,20 +86,11 @@ const NewPage: NextPageWithLayout = () => {
       await router.push(`/c/${componentId}`);
       return;
     } catch (e) {
+      console.error("🚀 ~ handleGenerateComponent error:", e);
       setIsGenerating(false);
       toast.error("Failed to generate component");
       return;
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (input === "") return;
-    handleGenerateComponent(input);
   };
 
   return (
@@ -161,23 +158,14 @@ const NewPage: NextPageWithLayout = () => {
               </div>
             </Dialog>
           </Transition>
-          <form onSubmit={handleSubmit} ref={formRef}>
-            <div className="relative mx-5 my-64 flex items-center sm:mx-10 md:mx-32">
-              <input
-                type="text"
-                className="block w-full rounded-md border-0 py-1.5 pr-14 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                placeholder="A chat application panel with a header, a search input, and a list of recent conversations."
-                onChange={handleInputChange}
-              />
-              <button
-                type="submit"
-                className="ml-1 inline-flex items-center rounded-md bg-indigo-600 px-2 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                disabled={isGenerating}
-              >
-                <PaperAirplaneIcon className="h-4 w-4"></PaperAirplaneIcon>
-              </button>
-            </div>
-          </form>
+          <div className="relative mx-5 my-64 sm:mx-10 md:mx-32">
+            <RichTextInput
+              onSubmit={handleGenerateComponent}
+              disabled={isGenerating}
+              placeholder="描述您想要的组件，可以上传图片或语音作为参考..."
+              rows={3}
+            />
+          </div>
 
           <h2 className="text-base font-semibold leading-6 text-gray-900">
             Need some inspiration?
@@ -205,7 +193,10 @@ const NewPage: NextPageWithLayout = () => {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          handleGenerateComponent(item.description);
+                          handleGenerateComponent({
+                            text: item.description,
+                            media: [],
+                          });
                         }}
                         disabled={isGenerating}
                       >
