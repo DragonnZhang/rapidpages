@@ -13,7 +13,7 @@ import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 const MediaItemSchema = z.object({
   url: z.string(),
   name: z.string(),
-  type: z.enum(["image", "audio", "code"]), // 添加 code 类型
+  type: z.enum(["image", "audio", "code", "element"]), // 添加 element 类型
 });
 
 export const componentRouter = createTRPCRouter({

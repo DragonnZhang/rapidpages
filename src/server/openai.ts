@@ -66,7 +66,7 @@ const extractMultipleCodeBlocks = (input: string): ComponentFile[] | null => {
 interface MediaItem {
   url: string;
   name: string;
-  type: "image" | "audio" | "code"; // 添加 code 类型
+  type: "image" | "audio" | "code" | "element"; // 添加 element 类型
 }
 
 export async function reviseComponent(
@@ -97,7 +97,9 @@ export async function reviseComponent(
           ? "图片"
           : mediaItem.type === "audio"
           ? "音频文件"
-          : "代码文件";
+          : mediaItem.type === "code"
+          ? "代码文件"
+          : "页面元素";
       mediaContext += `${index + 1}. ${fileType} "${mediaItem.name}": ${
         mediaItem.url
       }\n`;
@@ -159,10 +161,14 @@ export async function reviseComponent(
           filename: mediaItem.name,
         });
       } else if (mediaItem.type === "code") {
-        // 对于代码文件，将其作为文本内容添加
         userContentParts.push({
           type: "text",
           text: `这是一个代码文件作为参考：${mediaItem.name}\n\`\`\`tsx\n${mediaItem.url}\n\`\`\``,
+        });
+      } else if (mediaItem.type === "element") {
+        userContentParts.push({
+          type: "text",
+          text: `这是一个页面元素作为参考：${mediaItem.name}\n\`\`\`html\n${mediaItem.url}\n\`\`\``,
         });
       }
     });
@@ -307,7 +313,9 @@ export async function generateNewComponent(
           ? "图片"
           : mediaItem.type === "audio"
           ? "音频文件"
-          : "代码文件";
+          : mediaItem.type === "code"
+          ? "代码文件"
+          : "页面元素";
       mediaContext += `${index + 1}. ${fileType} "${mediaItem.name}": ${
         mediaItem.url
       }\n`;
@@ -384,10 +392,14 @@ export async function generateNewComponent(
           filename: mediaItem.name,
         });
       } else if (mediaItem.type === "code") {
-        // 对于代码文件，将其作为文本内容添加
         userContentParts.push({
           type: "text",
           text: `这是一个代码文件作为参考：${mediaItem.name}\n\`\`\`tsx\n${mediaItem.url}\n\`\`\``,
+        });
+      } else if (mediaItem.type === "element") {
+        userContentParts.push({
+          type: "text",
+          text: `这是一个页面元素作为参考：${mediaItem.name}\n\`\`\`html\n${mediaItem.url}\n\`\`\``,
         });
       }
     });

@@ -5,6 +5,7 @@ import {
   MicrophoneIcon,
   XMarkIcon,
   CodeBracketIcon,
+  CursorArrowRaysIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "~/utils/utils";
 import { type RichTextContent, type MediaItem } from "~/types/multimodal";
@@ -24,7 +25,7 @@ interface RichTextInputProps {
 interface MediaBadge {
   id: string;
   filename: string;
-  type: "image" | "audio" | "code";
+  type: "image" | "audio" | "code" | "element";
   position: number;
 }
 
@@ -271,6 +272,102 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     };
   }, [handleCodeFileDrop]);
 
+  // 处理元素选择
+  const handleElementDrop = useCallback(
+    (elementData: { type: string; name: string; content: string }) => {
+      const mediaItem: MediaItem = {
+        id: generateId(),
+        type: "element",
+        url: elementData.content, // 存储元素的HTML内容
+        name: elementData.name,
+        size: elementData.content.length,
+      };
+
+      setMedia((prev) => [...prev, mediaItem]);
+
+      // 在当前光标位置插入元素标记
+      const displayName =
+        elementData.name.length > 20
+          ? elementData.name.substring(0, 17) + "..."
+          : elementData.name;
+      const placeholder = `[${displayName}]`;
+
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newText =
+          currentText.substring(0, start) +
+          placeholder +
+          currentText.substring(end);
+
+        setCurrentText(newText);
+
+        // 创建badge
+        const newBadge: MediaBadge = {
+          id: mediaItem.id,
+          filename: elementData.name,
+          type: "element",
+          position: start,
+        };
+
+        setMediaBadges((prev) => [...prev, newBadge]);
+
+        // 设置新的光标位置
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd =
+            start + placeholder.length;
+          setCursorPosition(start + placeholder.length);
+        }, 0);
+      }
+
+      return mediaItem;
+    },
+    [currentText],
+  );
+
+  // 监听元素选择事件
+  useEffect(() => {
+    const handleElementSelection = (event: CustomEvent) => {
+      handleElementDrop(event.detail);
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const data = e.dataTransfer?.getData("application/json");
+      if (data) {
+        try {
+          const dragData = JSON.parse(data);
+          if (dragData.type === "element") {
+            handleElementDrop(dragData);
+          }
+        } catch (error) {
+          console.error("Failed to parse drag data:", error);
+        }
+      }
+    };
+
+    window.addEventListener(
+      "elementDrop",
+      handleElementSelection as EventListener,
+    );
+    containerRef.current?.addEventListener("dragover", handleDragOver);
+    containerRef.current?.addEventListener("drop", handleDrop);
+
+    return () => {
+      window.removeEventListener(
+        "elementDrop",
+        handleElementSelection as EventListener,
+      );
+      containerRef.current?.removeEventListener("dragover", handleDragOver);
+      containerRef.current?.removeEventListener("drop", handleDrop);
+    };
+  }, [handleCodeFileDrop, handleElementDrop]);
+
   // 渲染带有badge的文本
   const renderTextWithBadges = () => {
     if (!currentText) return null;
@@ -313,6 +410,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return <MicrophoneIcon className="h-3 w-3" />;
             case "code":
               return <CodeBracketIcon className="h-3 w-3" />;
+            case "element":
+              return <CursorArrowRaysIcon className="h-3 w-3" />;
             default:
               return <PhotoIcon className="h-3 w-3" />;
           }
@@ -326,6 +425,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return "border border-green-200 bg-green-100 text-green-800";
             case "code":
               return "border border-purple-200 bg-purple-100 text-purple-800";
+            case "element":
+              return "border border-orange-200 bg-orange-100 text-orange-800";
             default:
               return "border border-blue-200 bg-blue-100 text-blue-800";
           }
