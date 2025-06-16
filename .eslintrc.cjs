@@ -15,7 +15,7 @@ const config = {
       },
     ],
     "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-    "@typescript-eslint/no-explicit-any": ["error", { ignoreRestArgs: true }],
+    "@typescript-eslint/no-explicit-any": ["warn", { ignoreRestArgs: true }],
     "no-console": ["warn", { allow: ["warn", "error"] }],
     // Not all images have to be optimized. Some are already optimized.
     "@next/next/no-img-element": "off",

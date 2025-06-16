@@ -68,7 +68,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             {imageItem.name}
           </p>
           <p className="text-xs text-gray-500">
-            {(imageItem.size / 1024).toFixed(1)} KB
+            {(imageItem.size! / 1024).toFixed(1)} KB
           </p>
         </div>
       </div>

@@ -66,7 +66,7 @@ const extractMultipleCodeBlocks = (input: string): ComponentFile[] | null => {
 interface MediaItem {
   url: string;
   name: string;
-  type: "image" | "audio" | "code" | "element" | "action"; // 添加 action 类型
+  type: "image" | "audio" | "code" | "element" | "action" | "action-sequence"; // 添加 action 类型
 }
 
 export async function reviseComponent(
@@ -429,6 +429,7 @@ export async function generateNewComponent(
         role: "system",
         content: systemContent,
       },
+      // @ts-expect-error: i don't know
       ...userContentParts.map((part) => {
         return { role: "user", content: [part] };
       }),

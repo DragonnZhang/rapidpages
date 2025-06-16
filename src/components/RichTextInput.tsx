@@ -9,7 +9,11 @@ import {
   ClockIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "~/utils/utils";
-import { type RichTextContent, type MediaItem } from "~/types/multimodal";
+import {
+  type RichTextContent,
+  type MediaItem,
+  type ActionRecord,
+} from "~/types/multimodal";
 import {
   extractImagesFromClipboard,
   isImageFile,

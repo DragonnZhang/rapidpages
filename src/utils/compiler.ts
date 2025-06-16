@@ -90,7 +90,7 @@ export const compileTypescript = async (files: ComponentFile[]) => {
   `;
 
   // 创建一个虚拟文件系统用于 esbuild
-  const virtualFileSystem = {};
+  const virtualFileSystem: Record<string, string> = {};
 
   // 将所有组件文件添加到虚拟文件系统
   files.forEach((file) => {
@@ -241,7 +241,7 @@ const babelCompile = (code: string, filename: string) =>
   });
 
 // 根据文件扩展名获取合适的loader
-function getLoaderForFile(filename: string): string {
+function getLoaderForFile(filename: string): esbuild.Loader {
   if (filename.endsWith(".tsx")) return "tsx";
   if (filename.endsWith(".ts")) return "ts";
   if (filename.endsWith(".jsx")) return "jsx";
