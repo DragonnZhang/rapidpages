@@ -38,12 +38,6 @@ export const PageEditor = ({ code }: MyProps) => {
         : "点击"
     } <${tagName}>`;
 
-    if (elementId) {
-      description += ` (id: ${elementId})`;
-    } else if (elementClass) {
-      description += ` (class: ${elementClass.split(" ")[0]})`;
-    }
-
     if (elementText) {
       description += ` - "${elementText}"`;
     }
@@ -366,7 +360,7 @@ export const PageEditor = ({ code }: MyProps) => {
           title={`${showActionHistory ? "隐藏" : "显示"}操作历史记录`}
         >
           <ClockIcon className="mr-1 h-4 w-4" />
-          历史 ({actionHistory.length})
+          History ({actionHistory.length})
         </button>
 
         {/* 元素选择按钮 */}

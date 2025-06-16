@@ -15,6 +15,7 @@ import {
   isImageFile,
   isAudioFile,
 } from "~/utils/fileUtils";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 
 interface RichTextInputProps {
   onSubmit: (content: RichTextContent) => void;
@@ -40,6 +41,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [mediaBadges, setMediaBadges] = useState<MediaBadge[]>([]);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [previewImage, setPreviewImage] = useState<MediaItem | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -123,11 +126,6 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   // 处理图片选择
   const handleImageSelect = () => {
     fileInputRef.current?.click();
-  };
-
-  // 处理音频选择
-  const handleAudioSelect = () => {
-    audioInputRef.current?.click();
   };
 
   // 处理文件输入变化
@@ -537,12 +535,20 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
           <span
             key={`badge-${badge.id}`}
             className={cn([
-              "mx-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              "mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
               getBadgeColors(),
             ])}
             style={{
               pointerEvents: "auto",
               verticalAlign: "middle",
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // 如果是图片类型，打开预览
+              if (badge.type === "image") {
+                openImagePreview(badge.id);
+              }
             }}
           >
             {getBadgeIcon()}
@@ -668,204 +674,222 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     [handleFileUpload],
   );
 
+  // 打开图片预览
+  const openImagePreview = (mediaId: string) => {
+    const imageItem = media.find(
+      (item) => item.id === mediaId && item.type === "image",
+    );
+    if (imageItem) {
+      setPreviewImage(imageItem);
+      setShowPreview(true);
+    }
+  };
+
+  // 关闭图片预览
+  const closeImagePreview = () => {
+    setShowPreview(false);
+    setPreviewImage(null);
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="relative flex w-full rounded-lg border border-gray-300 bg-gray-200"
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragEnter}
-      onDrop={handleDrop}
-    >
-      <div className="relative min-w-0 flex-1">
-        <form className="relative" onSubmit={handleSubmit}>
-          <div className="overflow-hidden rounded-lg bg-white focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-600">
-            <label htmlFor="richTextInput" className="sr-only">
-              添加内容
-            </label>
+    <>
+      <div
+        ref={containerRef}
+        className="relative flex w-full rounded-lg border border-gray-300 bg-gray-200"
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDrop={handleDrop}
+      >
+        <div className="relative min-w-0 flex-1">
+          <form className="relative" onSubmit={handleSubmit}>
+            <div className="overflow-hidden rounded-lg bg-white focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-600">
+              <label htmlFor="richTextInput" className="sr-only">
+                添加内容
+              </label>
 
-            <div className="relative">
-              {/* 显示层 - 带有badge的文本 */}
-              <div
-                className="absolute inset-0 whitespace-pre-wrap break-words px-3 py-1.5 text-sm leading-6"
-                style={{
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                  fontSize: "0.875rem",
-                  lineHeight: "1.5rem",
-                  color: "#111827",
-                  zIndex: 2,
-                  pointerEvents: "none",
-                }}
-              >
-                {currentText && renderTextWithBadges()}
+              <div className="relative">
+                {/* 显示层 - 带有badge的文本 */}
+                <div
+                  className="absolute inset-0 whitespace-pre-wrap break-words px-3 py-1.5 text-sm leading-6"
+                  style={{
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                    fontSize: "0.875rem",
+                    lineHeight: "1.5rem",
+                    color: "#111827",
+                    zIndex: 2,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {currentText && renderTextWithBadges()}
+                </div>
+
+                {/* 输入层 - 完全透明的文本用于光标和选择 */}
+                <textarea
+                  ref={textareaRef}
+                  rows={rows}
+                  name="richTextInput"
+                  id="richTextInput"
+                  disabled={disabled}
+                  value={currentText}
+                  onChange={(e) => setCurrentText(e.target.value)}
+                  onClick={handleTextareaClick}
+                  onKeyUp={handleTextareaKeyUp}
+                  className="relative block w-full resize-none border-0 bg-transparent px-3 py-1.5 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6"
+                  placeholder={!currentText ? placeholder : ""}
+                  onKeyDown={handleKeyDown}
+                  style={{
+                    caretColor: "#111827",
+                    fontSize: "0.875rem",
+                    lineHeight: "1.5rem",
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                    color: "transparent",
+                    backgroundColor: "transparent",
+                    zIndex: 1,
+                  }}
+                  onPaste={handlePaste}
+                />
               </div>
 
-              {/* 输入层 - 完全透明的文本用于光标和选择 */}
-              <textarea
-                ref={textareaRef}
-                rows={rows}
-                name="richTextInput"
-                id="richTextInput"
-                disabled={disabled}
-                value={currentText}
-                onChange={(e) => setCurrentText(e.target.value)}
-                onClick={handleTextareaClick}
-                onKeyUp={handleTextareaKeyUp}
-                className="relative block w-full resize-none border-0 bg-transparent px-3 py-1.5 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6"
-                placeholder={!currentText ? placeholder : ""}
-                onKeyDown={handleKeyDown}
-                style={{
-                  caretColor: "#111827",
-                  fontSize: "0.875rem",
-                  lineHeight: "1.5rem",
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                  color: "transparent",
-                  backgroundColor: "transparent",
-                  zIndex: 1,
-                }}
-                onPaste={handlePaste}
-              />
-            </div>
+              {/* 工具栏 */}
+              <div className="flex items-center justify-between border-t border-gray-200 px-3 py-2">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={handleImageSelect}
+                    disabled={disabled}
+                    className="inline-flex items-center rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <PhotoIcon className="mr-1 h-4 w-4" />
+                    Upload Image
+                  </button>
+                  <span className="ml-2 text-xs text-gray-400">
+                    Supports pasting screenshots, dragging and dropping files,
+                    code snippets, elements, or operation history.
+                  </span>
+                </div>
 
-            {/* 工具栏 */}
-            <div className="flex items-center justify-between border-t border-gray-200 px-3 py-2">
-              <div className="flex items-center space-x-2">
                 <button
-                  type="button"
-                  onClick={handleImageSelect}
-                  disabled={disabled}
-                  className="inline-flex items-center rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                  type="submit"
+                  disabled={
+                    disabled || (!currentText.trim() && media.length === 0)
+                  }
+                  className={cn([
+                    "inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+                    (disabled || (!currentText.trim() && media.length === 0)) &&
+                      "cursor-not-allowed opacity-50",
+                  ])}
                 >
-                  <PhotoIcon className="mr-1 h-4 w-4" />
-                  图片
+                  {disabled ? (
+                    <div className="h-4 w-4 stroke-gray-300">
+                      <svg className="animate-spin" viewBox="0 0 256 256">
+                        <line
+                          x1="128"
+                          y1="32"
+                          x2="128"
+                          y2="64"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="195.9"
+                          y1="60.1"
+                          x2="173.3"
+                          y2="82.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="224"
+                          y1="128"
+                          x2="192"
+                          y2="128"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="195.9"
+                          y1="195.9"
+                          x2="173.3"
+                          y2="173.3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="128"
+                          y1="224"
+                          x2="128"
+                          y2="192"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="60.1"
+                          y1="195.9"
+                          x2="82.7"
+                          y2="173.3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="32"
+                          y1="128"
+                          x2="64"
+                          y2="128"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                        <line
+                          x1="60.1"
+                          y1="60.1"
+                          x2="82.7"
+                          y2="82.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="24"
+                        ></line>
+                      </svg>
+                    </div>
+                  ) : (
+                    <PaperAirplaneIcon className="h-4 w-4" />
+                  )}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleAudioSelect}
-                  disabled={disabled}
-                  className="inline-flex items-center rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                >
-                  <MicrophoneIcon className="mr-1 h-4 w-4" />
-                  语音
-                </button>
-                <span className="ml-2 text-xs text-gray-400">
-                  支持粘贴截图、拖拽文件或代码文件
-                </span>
               </div>
-
-              <button
-                type="submit"
-                disabled={
-                  disabled || (!currentText.trim() && media.length === 0)
-                }
-                className={cn([
-                  "inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
-                  (disabled || (!currentText.trim() && media.length === 0)) &&
-                    "cursor-not-allowed opacity-50",
-                ])}
-              >
-                {disabled ? (
-                  <div className="h-4 w-4 stroke-gray-300">
-                    <svg className="animate-spin" viewBox="0 0 256 256">
-                      <line
-                        x1="128"
-                        y1="32"
-                        x2="128"
-                        y2="64"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="195.9"
-                        y1="60.1"
-                        x2="173.3"
-                        y2="82.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="224"
-                        y1="128"
-                        x2="192"
-                        y2="128"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="195.9"
-                        y1="195.9"
-                        x2="173.3"
-                        y2="173.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="128"
-                        y1="224"
-                        x2="128"
-                        y2="192"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="60.1"
-                        y1="195.9"
-                        x2="82.7"
-                        y2="173.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="32"
-                        y1="128"
-                        x2="64"
-                        y2="128"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                      <line
-                        x1="60.1"
-                        y1="60.1"
-                        x2="82.7"
-                        y2="82.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="24"
-                      ></line>
-                    </svg>
-                  </div>
-                ) : (
-                  <PaperAirplaneIcon className="h-4 w-4" />
-                )}
-              </button>
             </div>
-          </div>
 
-          {/* 隐藏的文件输入 */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => onFileChange(e, "image")}
-            className="hidden"
-          />
-          <input
-            ref={audioInputRef}
-            type="file"
-            accept="audio/*"
-            onChange={(e) => onFileChange(e, "audio")}
-            className="hidden"
-          />
-        </form>
+            {/* 隐藏的文件输入 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => onFileChange(e, "image")}
+              className="hidden"
+            />
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={(e) => onFileChange(e, "audio")}
+              className="hidden"
+            />
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* 图片预览模态 */}
+      <ImagePreviewModal
+        imageItem={previewImage}
+        isOpen={showPreview}
+        onClose={closeImagePreview}
+      />
+    </>
   );
 };

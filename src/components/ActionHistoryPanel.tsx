@@ -66,7 +66,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
     <div className="absolute left-4 top-4 z-20 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
       {/* 头部 */}
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <h3 className="text-sm font-medium text-gray-900">操作历史记录</h3>
+        <h3 className="text-sm font-medium text-gray-900">Operation History</h3>
         <div className="flex space-x-1">
           <button
             onClick={onClear}
@@ -129,7 +129,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       {/* 底部说明 */}
       <div className="border-t border-gray-200 px-4 py-2">
         <p className="text-xs text-gray-500">
-          点击或拖拽操作记录到输入框作为参考
+          Click or drag history into the input as reference
         </p>
       </div>
     </div>
