@@ -14,10 +14,11 @@ export interface RichTextContent {
 export interface ActionRecord {
   id: string;
   timestamp: number;
-  type: "click" | "rightclick" | "doubleclick";
+  type: "click" | "rightclick" | "doubleclick" | "input";
   elementTag: string;
-  elementText?: string;
-  elementClass?: string;
-  elementId?: string;
+  elementText: string;
+  elementClass: string;
+  elementId: string;
   description: string;
+  inputValue?: string; // 新增：记录输入的内容
 }

@@ -57,8 +57,25 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
         return "👉";
       case "doubleclick":
         return "👆👆";
+      case "input":
+        return "⌨️";
       default:
         return "📱";
+    }
+  };
+
+  const getActionColor = (type: string) => {
+    switch (type) {
+      case "click":
+        return "text-blue-600";
+      case "rightclick":
+        return "text-purple-600";
+      case "doubleclick":
+        return "text-green-600";
+      case "input":
+        return "text-orange-600";
+      default:
+        return "text-gray-600";
     }
   };
 
@@ -107,7 +124,9 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
                 title="点击或拖拽到输入框"
               >
                 <div className="flex items-start space-x-3">
-                  <span className="text-lg">{getActionIcon(action.type)}</span>
+                  <span className={`text-lg ${getActionColor(action.type)}`}>
+                    {getActionIcon(action.type)}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900">
                       {action.description}
@@ -115,6 +134,11 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
                     <p className="text-xs text-gray-500">
                       {formatTime(action.timestamp)}
                     </p>
+                    {action.inputValue && action.type === "input" && (
+                      <p className="mt-1 truncate rounded bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                        完整内容: {action.inputValue}
+                      </p>
+                    )}
                   </div>
                   <div className="opacity-0 transition-opacity group-hover:opacity-100">
                     <span className="text-xs text-gray-400">可拖拽</span>

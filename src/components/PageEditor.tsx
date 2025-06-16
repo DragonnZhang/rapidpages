@@ -19,27 +19,47 @@ export const PageEditor = ({ code }: MyProps) => {
   );
   const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
   const [showActionHistory, setShowActionHistory] = useState(false);
+  const currentInputActionRef = useRef<ActionRecord | null>(null);
 
   // 添加操作记录
   const addActionRecord = (
-    type: "click" | "rightclick" | "doubleclick",
+    type: "click" | "rightclick" | "doubleclick" | "input",
     element: HTMLElement,
+    inputValue?: string,
   ) => {
     const tagName = element.tagName.toLowerCase();
     const elementText = element.textContent?.trim().substring(0, 50) || "";
     const elementClass = element.className || "";
     const elementId = element.id || "";
 
-    let description = `${
-      type === "rightclick"
-        ? "右键点击"
-        : type === "doubleclick"
-        ? "双击"
-        : "点击"
-    } <${tagName}>`;
+    let description = "";
 
-    if (elementText) {
-      description += ` - "${elementText}"`;
+    if (type === "input") {
+      description = `在 <${tagName}> 输入`;
+      if (elementId) {
+        description += ` (id: ${elementId})`;
+      } else if (elementClass) {
+        description += ` (class: ${elementClass.split(" ")[0]})`;
+      }
+      if (inputValue) {
+        description += ` - "${
+          inputValue.length > 30
+            ? inputValue.substring(0, 30) + "..."
+            : inputValue
+        }"`;
+      }
+    } else {
+      description = `${
+        type === "rightclick"
+          ? "右键点击"
+          : type === "doubleclick"
+          ? "双击"
+          : "点击"
+      } <${tagName}>`;
+
+      if (elementText) {
+        description += ` - "${elementText}"`;
+      }
     }
 
     const record: ActionRecord = {
@@ -51,27 +71,124 @@ export const PageEditor = ({ code }: MyProps) => {
       elementClass,
       elementId,
       description,
+      inputValue,
     };
 
-    console.log("🚀 ~ addActionRecord ~ record:", record); // 添加调试日志
-    setActionHistory((prev) => [record, ...prev].slice(0, 50)); // 保持最近50条记录
+    console.log("🚀 ~ addActionRecord ~ record:", record);
+    setActionHistory((prev) => [record, ...prev].slice(0, 50));
+
+    return record; // 返回创建的记录
+  };
+
+  // 处理输入操作（使用 useRef 管理状态）
+  const handleInputAction = (element: HTMLElement, value: string) => {
+    const tagName = element.tagName.toLowerCase();
+    const elementId = element.id || "";
+    const elementClass = element.className || "";
+
+    console.log(
+      "🚀 ~ handleInputAction ~ currentInputActionRef.current:",
+      currentInputActionRef.current,
+    );
+    console.log(
+      "🚀 ~ handleInputAction ~ tagName:",
+      tagName,
+      "elementId:",
+      elementId,
+      "elementClass:",
+      elementClass,
+    );
+
+    // 检查是否是同一个输入框的连续输入
+    const isSameElement =
+      currentInputActionRef.current &&
+      currentInputActionRef.current.elementTag === tagName &&
+      currentInputActionRef.current.elementId === elementId &&
+      currentInputActionRef.current.elementClass === elementClass;
+
+    console.log("🚀 ~ handleInputAction ~ isSameElement:", isSameElement);
+
+    if (isSameElement && currentInputActionRef.current) {
+      console.log("🚀 ~ Updating existing input record");
+      // 更新现有记录的描述和输入值
+      let description = `在 <${tagName}> 输入`;
+      if (elementId) {
+        description += ` (id: ${elementId})`;
+      } else if (elementClass) {
+        description += ` (class: ${elementClass.split(" ")[0]})`;
+      }
+      if (value) {
+        description += ` - "${
+          value.length > 30 ? value.substring(0, 30) + "..." : value
+        }"`;
+      }
+
+      const updatedAction: ActionRecord = {
+        ...currentInputActionRef.current,
+        timestamp: Date.now(),
+        inputValue: value,
+        description,
+      };
+
+      // 更新 ref 和状态
+      currentInputActionRef.current = updatedAction;
+
+      // 更新历史记录中的对应项（保持在原位置）
+      setActionHistory((prev) =>
+        prev.map((action) =>
+          action.id === updatedAction.id ? updatedAction : action,
+        ),
+      );
+    } else {
+      console.log("🚀 ~ Creating new input record");
+      // 只有在不是连续输入的情况下才创建新记录
+      let description = `在 <${tagName}> 输入`;
+      if (elementId) {
+        description += ` (id: ${elementId})`;
+      } else if (elementClass) {
+        description += ` (class: ${elementClass.split(" ")[0]})`;
+      }
+      if (value) {
+        description += ` - "${
+          value.length > 30 ? value.substring(0, 30) + "..." : value
+        }"`;
+      }
+
+      const newRecord: ActionRecord = {
+        id: Math.random().toString(36).substring(2, 15),
+        timestamp: Date.now(),
+        type: "input",
+        elementTag: tagName,
+        elementText: element.textContent?.trim().substring(0, 50) || "",
+        elementClass,
+        elementId,
+        description,
+        inputValue: value,
+      };
+
+      console.log("🚀 ~ Creating new input record:", newRecord);
+
+      // 先设置 ref，再添加到历史记录
+      currentInputActionRef.current = newRecord;
+      setActionHistory((prev) => [newRecord, ...prev].slice(0, 50));
+    }
   };
 
   // 添加iframe事件监听器
   const addIframeEventListeners = () => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) {
-      console.log("🚀 ~ iframe contentDocument not ready"); // 调试日志
+      console.log("🚀 ~ iframe contentDocument not ready");
       return null;
     }
 
     const iframeDoc = iframe.contentDocument;
-    console.log("🚀 ~ Adding iframe event listeners"); // 调试日志
+    console.log("🚀 ~ Adding iframe event listeners");
 
     // 点击事件
     const handleIframeClick = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe click detected", e.target); // 调试日志
-      if (isElementSelectMode) return; // 选择模式下不记录
+      console.log("🚀 ~ iframe click detected", e.target);
+      if (isElementSelectMode) return;
 
       const target = e.target as HTMLElement;
       if (
@@ -80,13 +197,15 @@ export const PageEditor = ({ code }: MyProps) => {
         target !== iframeDoc.documentElement
       ) {
         addActionRecord("click", target);
+        // 点击时清除当前输入操作引用
+        currentInputActionRef.current = null;
       }
     };
 
     // 右键点击事件
     const handleIframeContextMenu = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe contextmenu detected", e.target); // 调试日志
-      if (isElementSelectMode) return; // 选择模式下不记录
+      console.log("🚀 ~ iframe contextmenu detected", e.target);
+      if (isElementSelectMode) return;
 
       const target = e.target as HTMLElement;
       if (
@@ -95,13 +214,15 @@ export const PageEditor = ({ code }: MyProps) => {
         target !== iframeDoc.documentElement
       ) {
         addActionRecord("rightclick", target);
+        // 右键点击时清除当前输入操作引用
+        currentInputActionRef.current = null;
       }
     };
 
     // 双击事件
     const handleIframeDoubleClick = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe dblclick detected", e.target); // 调试日志
-      if (isElementSelectMode) return; // 选择模式下不记录
+      console.log("🚀 ~ iframe dblclick detected", e.target);
+      if (isElementSelectMode) return;
 
       const target = e.target as HTMLElement;
       if (
@@ -110,15 +231,39 @@ export const PageEditor = ({ code }: MyProps) => {
         target !== iframeDoc.documentElement
       ) {
         addActionRecord("doubleclick", target);
+        // 双击时清除当前输入操作引用
+        currentInputActionRef.current = null;
       }
     };
 
-    iframeDoc.addEventListener("click", handleIframeClick, true); // 使用捕获阶段
+    // 统一的输入事件监听器
+    const handleIframeInput = (e: Event) => {
+      console.log("🚀 ~ iframe input detected", e.target);
+      if (isElementSelectMode) return;
+
+      const target = e.target as HTMLElement;
+
+      // 处理普通输入框和文本区域
+      if (
+        target.tagName.toLowerCase() === "input" ||
+        target.tagName.toLowerCase() === "textarea"
+      ) {
+        const inputTarget = target as HTMLInputElement | HTMLTextAreaElement;
+        handleInputAction(inputTarget, inputTarget.value);
+      }
+      // 处理内容可编辑元素
+      else if (target.isContentEditable) {
+        handleInputAction(target, target.textContent || "");
+      }
+    };
+
+    iframeDoc.addEventListener("click", handleIframeClick, true);
     iframeDoc.addEventListener("contextmenu", handleIframeContextMenu, true);
     iframeDoc.addEventListener("dblclick", handleIframeDoubleClick, true);
+    iframeDoc.addEventListener("input", handleIframeInput, true);
 
     return () => {
-      console.log("🚀 ~ Removing iframe event listeners"); // 调试日志
+      console.log("🚀 ~ Removing iframe event listeners");
       iframeDoc.removeEventListener("click", handleIframeClick, true);
       iframeDoc.removeEventListener(
         "contextmenu",
@@ -126,6 +271,7 @@ export const PageEditor = ({ code }: MyProps) => {
         true,
       );
       iframeDoc.removeEventListener("dblclick", handleIframeDoubleClick, true);
+      iframeDoc.removeEventListener("input", handleIframeInput, true);
     };
   };
 
