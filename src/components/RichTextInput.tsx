@@ -16,6 +16,7 @@ import {
   isAudioFile,
 } from "~/utils/fileUtils";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import { ActionSequenceBlock } from "./ActionSequenceBlock";
 
 interface RichTextInputProps {
   onSubmit: (content: RichTextContent) => void;
@@ -27,15 +28,16 @@ interface RichTextInputProps {
 interface MediaBadge {
   id: string;
   filename: string;
-  type: "image" | "audio" | "code" | "element" | "action";
+  type: "image" | "audio" | "code" | "element" | "action" | "action-sequence";
   position: number;
+  actionSequence?: ActionRecord[]; // 新增：存储操作序列
 }
 
 export const RichTextInput: React.FC<RichTextInputProps> = ({
   onSubmit,
   disabled = false,
   placeholder = "输入内容，可以插入图片、语音或代码文件...",
-  rows = 2,
+  rows = 4, // 从 2 改为 4，增加默认高度
 }) => {
   const [currentText, setCurrentText] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -463,6 +465,80 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     };
   }, [handleCodeFileDrop, handleElementDrop, handleActionDrop]);
 
+  // 处理操作序列
+  const handleActionSequenceDrop = useCallback(
+    (sequenceData: { type: string; name: string; actions: ActionRecord[] }) => {
+      const mediaItem: MediaItem = {
+        id: generateId(),
+        type: "action-sequence",
+        url: JSON.stringify(sequenceData.actions), // 存储操作序列的JSON
+        name: sequenceData.name,
+        size: sequenceData.actions.length,
+      };
+
+      setMedia((prev) => [...prev, mediaItem]);
+
+      // 在当前光标位置插入操作序列标记
+      const displayName =
+        sequenceData.name.length > 20
+          ? sequenceData.name.substring(0, 17) + "..."
+          : sequenceData.name;
+      const placeholder = `[${displayName}]`;
+
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newText =
+          currentText.substring(0, start) +
+          placeholder +
+          currentText.substring(end);
+
+        setCurrentText(newText);
+
+        // 创建badge
+        const newBadge: MediaBadge = {
+          id: mediaItem.id,
+          filename: sequenceData.name,
+          type: "action-sequence",
+          position: start,
+          actionSequence: sequenceData.actions,
+        };
+
+        setMediaBadges((prev) => [...prev, newBadge]);
+
+        // 设置新的光标位置
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd =
+            start + placeholder.length;
+          setCursorPosition(start + placeholder.length);
+        }, 0);
+      }
+
+      return mediaItem;
+    },
+    [currentText],
+  );
+
+  // 监听操作序列事件
+  useEffect(() => {
+    const handleActionSequenceSelection = (event: CustomEvent) => {
+      handleActionSequenceDrop(event.detail);
+    };
+
+    window.addEventListener(
+      "actionSequenceDrop",
+      handleActionSequenceSelection as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "actionSequenceDrop",
+        handleActionSequenceSelection as EventListener,
+      );
+    };
+  }, [handleActionSequenceDrop]);
+
   // 渲染带有badge的文本
   const renderTextWithBadges = () => {
     if (!currentText) return null;
@@ -481,7 +557,11 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
       // 添加前面的文本
       if (beforeText) {
         parts.push(
-          <span key={`text-${lastIndex}`} className="text-gray-900">
+          <span
+            key={`text-${lastIndex}`}
+            className="text-gray-900"
+            style={{ pointerEvents: "none" }} // 普通文本不可点击
+          >
             {beforeText}
           </span>,
         );
@@ -497,84 +577,110 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
       });
 
       if (badge) {
-        const getBadgeIcon = () => {
-          switch (badge.type) {
-            case "image":
-              return <PhotoIcon className="h-3 w-3" />;
-            case "audio":
-              return <MicrophoneIcon className="h-3 w-3" />;
-            case "code":
-              return <CodeBracketIcon className="h-3 w-3" />;
-            case "element":
-              return <CursorArrowRaysIcon className="h-3 w-3" />;
-            case "action":
-              return <ClockIcon className="h-3 w-3" />;
-            default:
-              return <PhotoIcon className="h-3 w-3" />;
-          }
-        };
+        // 如果是操作序列类型，渲染特殊的块组件
+        if (badge.type === "action-sequence" && badge.actionSequence) {
+          parts.push(
+            <div
+              key={`sequence-${badge.id}`}
+              style={{
+                pointerEvents: "auto", // 确保操作序列块可以交互
+                display: "inline-block",
+                verticalAlign: "middle",
+              }}
+              onClick={(e) => {
+                e.stopPropagation(); // 防止事件冒泡到 textarea
+              }}
+            >
+              <ActionSequenceBlock
+                actions={badge.actionSequence}
+                onRemove={() => removeMedia(badge.id)}
+              />
+            </div>,
+          );
+        } else {
+          const getBadgeIcon = () => {
+            switch (badge.type) {
+              case "image":
+                return <PhotoIcon className="h-3 w-3" />;
+              case "audio":
+                return <MicrophoneIcon className="h-3 w-3" />;
+              case "code":
+                return <CodeBracketIcon className="h-3 w-3" />;
+              case "element":
+                return <CursorArrowRaysIcon className="h-3 w-3" />;
+              case "action":
+                return <ClockIcon className="h-3 w-3" />;
+              default:
+                return <PhotoIcon className="h-3 w-3" />;
+            }
+          };
 
-        const getBadgeColors = () => {
-          switch (badge.type) {
-            case "image":
-              return "border border-blue-200 bg-blue-100 text-blue-800";
-            case "audio":
-              return "border border-green-200 bg-green-100 text-green-800";
-            case "code":
-              return "border border-purple-200 bg-purple-100 text-purple-800";
-            case "element":
-              return "border border-orange-200 bg-orange-100 text-orange-800";
-            case "action":
-              return "border border-yellow-200 bg-yellow-100 text-yellow-800";
-            default:
-              return "border border-blue-200 bg-blue-100 text-blue-800";
-          }
-        };
+          const getBadgeColors = () => {
+            switch (badge.type) {
+              case "image":
+                return "border border-blue-200 bg-blue-100 text-blue-800";
+              case "audio":
+                return "border border-green-200 bg-green-100 text-green-800";
+              case "code":
+                return "border border-purple-200 bg-purple-100 text-purple-800";
+              case "element":
+                return "border border-orange-200 bg-orange-100 text-orange-800";
+              case "action":
+                return "border border-yellow-200 bg-yellow-100 text-yellow-800";
+              default:
+                return "border border-blue-200 bg-blue-100 text-blue-800";
+            }
+          };
 
-        parts.push(
-          <span
-            key={`badge-${badge.id}`}
-            className={cn([
-              "mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-              getBadgeColors(),
-            ])}
-            style={{
-              pointerEvents: "auto",
-              verticalAlign: "middle",
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // 如果是图片类型，打开预览
-              if (badge.type === "image") {
-                openImagePreview(badge.id);
-              }
-            }}
-          >
-            {getBadgeIcon()}
-            <span className="max-w-24 truncate">{badge.filename}</span>
-            <button
-              type="button"
+          parts.push(
+            <span
+              key={`badge-${badge.id}`}
+              className={cn([
+                "mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                getBadgeColors(),
+              ])}
+              style={{
+                pointerEvents: "auto",
+                verticalAlign: "middle",
+              }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                removeMedia(badge.id);
+                // 如果是图片类型，打开预览
+                if (badge.type === "image") {
+                  openImagePreview(badge.id);
+                }
               }}
-              onMouseDown={(e) => {
-                e.preventDefault(); // 防止textarea失去焦点
-                e.stopPropagation();
-              }}
-              className="ml-0.5 cursor-pointer text-current opacity-50 hover:opacity-100"
-              style={{ pointerEvents: "auto" }}
             >
-              <XMarkIcon className="h-2.5 w-2.5" />
-            </button>
-          </span>,
-        );
+              {getBadgeIcon()}
+              <span className="max-w-24 truncate">{badge.filename}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  removeMedia(badge.id);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // 防止textarea失去焦点
+                  e.stopPropagation();
+                }}
+                className="ml-0.5 cursor-pointer text-current opacity-50 hover:opacity-100"
+                style={{ pointerEvents: "auto" }}
+              >
+                <XMarkIcon className="h-2.5 w-2.5" />
+              </button>
+            </span>,
+          );
+        }
       } else {
         // 如果找不到对应的badge，显示原文本
         parts.push(
-          <span key={`placeholder-${match.index}`} className="text-gray-500">
+          <span
+            key={`placeholder-${match.index}`}
+            className="text-gray-500"
+            style={{ pointerEvents: "none" }}
+          >
             [{placeholderText}]
           </span>,
         );
@@ -586,7 +692,11 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     // 添加剩余的文本
     if (lastIndex < currentText.length) {
       parts.push(
-        <span key={`text-${lastIndex}`} className="text-gray-900">
+        <span
+          key={`text-${lastIndex}`}
+          className="text-gray-900"
+          style={{ pointerEvents: "none" }}
+        >
           {currentText.slice(lastIndex)}
         </span>,
       );
@@ -707,10 +817,10 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                 添加内容
               </label>
 
-              <div className="relative">
+              <div className="relative min-h-[120px]">
                 {/* 显示层 - 带有badge的文本 */}
                 <div
-                  className="absolute inset-0 whitespace-pre-wrap break-words px-3 py-1.5 text-sm leading-6"
+                  className="absolute inset-0 whitespace-pre-wrap break-words px-3 py-2 text-sm leading-6"
                   style={{
                     fontFamily:
                       'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
@@ -718,7 +828,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                     lineHeight: "1.5rem",
                     color: "#111827",
                     zIndex: 2,
-                    pointerEvents: "none",
+                    pointerEvents: "auto", // 改为 auto 以支持操作序列块的交互
                   }}
                 >
                   {currentText && renderTextWithBadges()}
@@ -735,7 +845,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                   onChange={(e) => setCurrentText(e.target.value)}
                   onClick={handleTextareaClick}
                   onKeyUp={handleTextareaKeyUp}
-                  className="relative block w-full resize-none border-0 bg-transparent px-3 py-1.5 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6"
+                  className="relative block w-full resize-none border-0 bg-transparent px-3 py-2 placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6"
                   placeholder={!currentText ? placeholder : ""}
                   onKeyDown={handleKeyDown}
                   style={{
@@ -747,13 +857,16 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                     color: "transparent",
                     backgroundColor: "transparent",
                     zIndex: 1,
+                    minHeight: "120px",
                   }}
                   onPaste={handlePaste}
                 />
               </div>
 
               {/* 工具栏 */}
-              <div className="flex items-center justify-between border-t border-gray-200 px-3 py-2">
+              <div className="flex items-center justify-between border-t border-gray-200 px-3 py-3">
+                {" "}
+                {/* 增加 py 从 2 到 3 */}
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
@@ -769,7 +882,6 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                     code snippets, elements, or operation history.
                   </span>
                 </div>
-
                 <button
                   type="submit"
                   disabled={

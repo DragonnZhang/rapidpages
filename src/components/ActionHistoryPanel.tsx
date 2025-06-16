@@ -14,6 +14,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
   onClear,
 }) => {
   const [draggedAction, setDraggedAction] = useState<ActionRecord | null>(null);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -37,8 +38,38 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
     setDraggedAction(null);
   };
 
-  const handleActionClick = (action: ActionRecord) => {
-    // 创建自定义事件，直接添加到输入框
+  const handleActionClick = (action: ActionRecord, e: React.MouseEvent) => {
+    // 如果按住 Ctrl/Cmd 键，支持多选
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedActions((prev) =>
+        prev.includes(action.id)
+          ? prev.filter((id) => id !== action.id)
+          : [...prev, action.id],
+      );
+      return;
+    }
+
+    // 如果有选中的多个操作，创建操作序列
+    if (selectedActions.length > 0) {
+      const sequenceActions = actions.filter((a) =>
+        selectedActions.includes(a.id),
+      );
+      const sequenceName = `操作序列 (${sequenceActions.length}项)`;
+
+      const event = new CustomEvent("actionSequenceDrop", {
+        detail: {
+          type: "action-sequence",
+          name: sequenceName,
+          actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp), // 按时间排序
+        },
+      });
+      window.dispatchEvent(event);
+
+      setSelectedActions([]); // 清除选择
+      return;
+    }
+
+    // 单个操作的原有逻辑
     const event = new CustomEvent("actionDrop", {
       detail: {
         type: "action",
@@ -102,6 +133,26 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
         </div>
       </div>
 
+      {/* 多选提示 */}
+      {selectedActions.length > 0 && (
+        <div className="border-b border-gray-200 bg-blue-50 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              已选择 {selectedActions.length} 项操作
+            </span>
+            <button
+              onClick={() => setSelectedActions([])}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              取消选择
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-blue-600">
+            点击任意操作创建序列，或继续选择更多操作
+          </p>
+        </div>
+      )}
+
       {/* 内容 */}
       <div className="max-h-96 overflow-y-auto">
         {actions.length === 0 ? (
@@ -116,12 +167,17 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
                 draggable
                 onDragStart={(e) => handleDragStart(e, action)}
                 onDragEnd={handleDragEnd}
-                onClick={() => handleActionClick(action)}
+                onClick={(e) => handleActionClick(action, e)}
                 className={`
                   group cursor-pointer px-4 py-3 transition-colors hover:bg-gray-50
                   ${draggedAction?.id === action.id ? "bg-blue-50" : ""}
+                  ${
+                    selectedActions.includes(action.id)
+                      ? "border-l-4 border-blue-500 bg-blue-100"
+                      : ""
+                  }
                 `}
-                title="点击或拖拽到输入框"
+                title="点击添加单个操作，Ctrl/Cmd+点击可多选创建序列"
               >
                 <div className="flex items-start space-x-3">
                   <span className={`text-lg ${getActionColor(action.type)}`}>
@@ -153,7 +209,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       {/* 底部说明 */}
       <div className="border-t border-gray-200 px-4 py-2">
         <p className="text-xs text-gray-500">
-          Click or drag history into the input as reference
+          点击添加单个操作，Ctrl/Cmd+点击可多选创建操作序列
         </p>
       </div>
     </div>
