@@ -1,5 +1,6 @@
 import { componentRouter } from "~/server/api/routers/component";
 import { userRouter } from "~/server/api/routers/user";
+import { aiRouter } from "~/server/api/routers/ai";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
 /**
@@ -11,6 +12,7 @@ export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => "ok"),
   component: componentRouter,
   user: userRouter,
+  ai: aiRouter,
 });
 
 // export type definition of API

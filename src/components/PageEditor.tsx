@@ -3,6 +3,7 @@ import { compileTypescript, type ComponentFile } from "~/utils/compiler";
 import { CursorArrowRaysIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { ActionHistoryPanel } from "./ActionHistoryPanel";
 import { type ActionRecord } from "~/types/multimodal";
+import { api } from "~/utils/api";
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
   code: ComponentFile[];
@@ -20,6 +21,7 @@ export const PageEditor = ({ code }: MyProps) => {
   const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
   const [showActionHistory, setShowActionHistory] = useState(false);
   const currentInputActionRef = useRef<ActionRecord | null>(null);
+  const generateDescriptionMutation = api.ai.generateDescription.useMutation();
 
   // 添加操作记录
   const addActionRecord = (
@@ -463,21 +465,41 @@ export const PageEditor = ({ code }: MyProps) => {
   };
 
   // 选择元素
-  const selectElement = (element: HTMLElement) => {
+  const selectElement = async (element: HTMLElement) => {
     const tagName = element.tagName.toLowerCase();
 
-    // 简化元素名称，只显示标签类型
-    const elementName = `<${tagName}>`;
-
-    // 创建自定义事件，通知 RichTextInput 组件
-    const event = new CustomEvent("elementDrop", {
-      detail: {
+    try {
+      // 调用AI生成元素描述
+      const result = await generateDescriptionMutation.mutateAsync({
         type: "element",
-        name: elementName,
         content: element.outerHTML,
-      },
-    });
-    window.dispatchEvent(event);
+        context: `标签类型: ${tagName}, 文本内容: ${element.textContent?.trim() || "无"}`,
+      });
+
+      const elementName = result.description;
+
+      // 创建自定义事件，通知 RichTextInput 组件
+      const event = new CustomEvent("elementDrop", {
+        detail: {
+          type: "element",
+          name: elementName,
+          content: element.outerHTML,
+        },
+      });
+      window.dispatchEvent(event);
+    } catch (error) {
+      console.error("生成元素描述失败:", error);
+      // 使用默认名称作为后备
+      const elementName = `<${tagName}>`;
+      const event = new CustomEvent("elementDrop", {
+        detail: {
+          type: "element",
+          name: elementName,
+          content: element.outerHTML,
+        },
+      });
+      window.dispatchEvent(event);
+    }
   };
 
   const handleScroll = (event: React.WheelEvent) => {

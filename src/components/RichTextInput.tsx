@@ -30,7 +30,8 @@ interface MediaBadge {
   filename: string;
   type: "image" | "audio" | "code" | "element" | "action" | "action-sequence";
   position: number;
-  actionSequence?: ActionRecord[]; // 新增：存储操作序列
+  actionSequence?: ActionRecord[];
+  displayName?: string; // 新增：用于显示AI生成的描述
 }
 
 export const RichTextInput: React.FC<RichTextInputProps> = ({
@@ -286,11 +287,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
-      // 在当前光标位置插入元素标记
-      const displayName =
-        elementData.name.length > 20
-          ? elementData.name.substring(0, 17) + "..."
-          : elementData.name;
+      // 使用AI生成的名称
+      const displayName = elementData.name;
       const placeholder = `[${displayName}]`;
 
       const textarea = textareaRef.current;
@@ -310,6 +308,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
           filename: elementData.name,
           type: "element",
           position: start,
+          displayName: elementData.name, // 保存AI生成的名称
         };
 
         setMediaBadges((prev) => [...prev, newBadge]);
@@ -372,21 +371,31 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   // 处理操作记录
   const handleActionDrop = useCallback(
     (actionData: { type: string; name: string; content: string }) => {
+      // 将单个操作也创建为 action-sequence 类型，只是只包含一个操作
+      const singleActionRecord: ActionRecord = {
+        id: Math.random().toString(36).substring(2, 15),
+        timestamp: Date.now(),
+        type: "input", // 这里可以根据实际情况调整
+        elementTag: "unknown",
+        elementText: "",
+        elementClass: "",
+        elementId: "",
+        description: actionData.content,
+        inputValue: undefined,
+      };
+
       const mediaItem: MediaItem = {
         id: generateId(),
-        type: "action",
-        url: actionData.content, // 存储操作描述
+        type: "action-sequence", // 改为 action-sequence 类型
+        url: JSON.stringify([singleActionRecord]), // 存储为包含单个操作的数组
         name: actionData.name,
-        size: actionData.content.length,
+        size: 1, // 单个操作
       };
 
       setMedia((prev) => [...prev, mediaItem]);
 
       // 在当前光标位置插入操作标记
-      const displayName =
-        actionData.name.length > 20
-          ? actionData.name.substring(0, 17) + "..."
-          : actionData.name;
+      const displayName = actionData.name;
       const placeholder = `[${displayName}]`;
 
       const textarea = textareaRef.current;
@@ -404,8 +413,10 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
         const newBadge: MediaBadge = {
           id: mediaItem.id,
           filename: actionData.name,
-          type: "action",
+          type: "action-sequence", // 改为 action-sequence 类型
           position: start,
+          actionSequence: [singleActionRecord], // 包含单个操作的数组
+          displayName: actionData.name,
         };
 
         setMediaBadges((prev) => [...prev, newBadge]);
@@ -478,11 +489,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
-      // 在当前光标位置插入操作序列标记
-      const displayName =
-        sequenceData.name.length > 20
-          ? sequenceData.name.substring(0, 17) + "..."
-          : sequenceData.name;
+      // 使用AI生成的名称而不是截断名称
+      const displayName = sequenceData.name;
       const placeholder = `[${displayName}]`;
 
       const textarea = textareaRef.current;
@@ -503,6 +511,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
           type: "action-sequence",
           position: start,
           actionSequence: sequenceData.actions,
+          displayName: sequenceData.name, // 保存AI生成的名称
         };
 
         setMediaBadges((prev) => [...prev, newBadge]);
@@ -560,20 +569,17 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
           <span
             key={`text-${lastIndex}`}
             className="text-gray-900"
-            style={{ pointerEvents: "none" }} // 普通文本不可点击
+            style={{ pointerEvents: "none" }}
           >
             {beforeText}
           </span>,
         );
       }
 
-      // 查找对应的媒体项
+      // 查找对应的媒体项（使用displayName或filename进行匹配）
       const badge = mediaBadges.find((b) => {
-        const displayName =
-          b.filename.length > 20
-            ? b.filename.substring(0, 17) + "..."
-            : b.filename;
-        return displayName === placeholderText;
+        const nameToMatch = b.displayName || b.filename;
+        return nameToMatch === placeholderText;
       });
 
       if (badge) {
@@ -583,17 +589,20 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
             <div
               key={`sequence-${badge.id}`}
               style={{
-                pointerEvents: "auto", // 确保操作序列块可以交互
+                pointerEvents: "auto", // 只为操作序列块启用指针事件
                 display: "inline-block",
                 verticalAlign: "middle",
+                position: "relative", // 添加相对定位
+                zIndex: 10, // 确保在上层
               }}
               onClick={(e) => {
-                e.stopPropagation(); // 防止事件冒泡到 textarea
+                e.stopPropagation();
               }}
             >
               <ActionSequenceBlock
                 actions={badge.actionSequence}
                 onRemove={() => removeMedia(badge.id)}
+                title={badge.displayName || badge.filename}
               />
             </div>,
           );
@@ -640,20 +649,23 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                 getBadgeColors(),
               ])}
               style={{
-                pointerEvents: "auto",
+                pointerEvents: "auto", // 为普通badge启用指针事件
                 verticalAlign: "middle",
+                position: "relative",
+                zIndex: 10,
               }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // 如果是图片类型，打开预览
                 if (badge.type === "image") {
                   openImagePreview(badge.id);
                 }
               }}
             >
               {getBadgeIcon()}
-              <span className="max-w-24 truncate">{badge.filename}</span>
+              <span className="max-w-24 truncate">
+                {badge.displayName || badge.filename}
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -662,7 +674,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                   removeMedia(badge.id);
                 }}
                 onMouseDown={(e) => {
-                  e.preventDefault(); // 防止textarea失去焦点
+                  e.preventDefault();
                   e.stopPropagation();
                 }}
                 className="ml-0.5 cursor-pointer text-current opacity-50 hover:opacity-100"
@@ -828,7 +840,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                     lineHeight: "1.5rem",
                     color: "#111827",
                     zIndex: 2,
-                    pointerEvents: "auto", // 改为 auto 以支持操作序列块的交互
+                    pointerEvents: "none", // 改回 none，只为特定元素启用指针事件
                   }}
                 >
                   {currentText && renderTextWithBadges()}

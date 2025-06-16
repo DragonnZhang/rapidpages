@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { XMarkIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { type ActionRecord } from "~/types/multimodal";
+import { api } from "~/utils/api";
 
 interface ActionHistoryPanelProps {
   actions: ActionRecord[];
@@ -15,6 +16,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
 }) => {
   const [draggedAction, setDraggedAction] = useState<ActionRecord | null>(null);
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const generateDescriptionMutation = api.ai.generateDescription.useMutation();
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -38,7 +40,10 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
     setDraggedAction(null);
   };
 
-  const handleActionClick = (action: ActionRecord, e: React.MouseEvent) => {
+  const handleActionClick = async (
+    action: ActionRecord,
+    e: React.MouseEvent,
+  ) => {
     // 如果按住 Ctrl/Cmd 键，支持多选
     if (e.ctrlKey || e.metaKey) {
       setSelectedActions((prev) =>
@@ -54,27 +59,54 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       const sequenceActions = actions.filter((a) =>
         selectedActions.includes(a.id),
       );
-      const sequenceName = `操作序列 (${sequenceActions.length}项)`;
 
-      const event = new CustomEvent("actionSequenceDrop", {
-        detail: {
+      try {
+        // 生成操作序列的描述
+        const actionDescriptions = sequenceActions
+          .sort((a, b) => a.timestamp - b.timestamp) // 按时间正序排列
+          .map((action) => `${action.description}`)
+          .join(" -> ");
+
+        const result = await generateDescriptionMutation.mutateAsync({
           type: "action-sequence",
-          name: sequenceName,
-          actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp), // 按时间排序
-        },
-      });
-      window.dispatchEvent(event);
+          content: actionDescriptions,
+          context: `操作数量: ${sequenceActions.length}`,
+        });
+
+        const sequenceName = `${result.description}（${sequenceActions.length}项）`;
+
+        const event = new CustomEvent("actionSequenceDrop", {
+          detail: {
+            type: "action-sequence",
+            name: sequenceName,
+            actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp), // 按时间倒序用于显示
+          },
+        });
+        window.dispatchEvent(event);
+      } catch (error) {
+        console.error("生成操作序列描述失败:", error);
+        // 使用默认名称作为后备
+        const sequenceName = `操作序列（${sequenceActions.length}项）`;
+        const event = new CustomEvent("actionSequenceDrop", {
+          detail: {
+            type: "action-sequence",
+            name: sequenceName,
+            actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp),
+          },
+        });
+        window.dispatchEvent(event);
+      }
 
       setSelectedActions([]); // 清除选择
       return;
     }
 
-    // 单个操作的原有逻辑
-    const event = new CustomEvent("actionDrop", {
+    // 单个操作也创建为操作序列（包含一个操作）
+    const event = new CustomEvent("actionSequenceDrop", {
       detail: {
-        type: "action",
-        name: action.description,
-        content: action.description,
+        type: "action-sequence",
+        name: action.description, // 使用操作描述作为名称
+        actions: [action], // 包含单个操作的数组
       },
     });
     window.dispatchEvent(event);
@@ -148,7 +180,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
             </button>
           </div>
           <p className="mt-1 text-xs text-blue-600">
-            点击任意操作创建序列，或继续选择更多操作
+            点击任意操作创建序列（AI将自动生成描述）
           </p>
         </div>
       )}
@@ -209,7 +241,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       {/* 底部说明 */}
       <div className="border-t border-gray-200 px-4 py-2">
         <p className="text-xs text-gray-500">
-          点击添加单个操作，Ctrl/Cmd+点击可多选创建操作序列
+          点击添加单个操作，Ctrl/Cmd+点击可多选创建AI描述的操作序列
         </p>
       </div>
     </div>
