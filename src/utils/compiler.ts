@@ -178,8 +178,12 @@ export const compileTypescript = async (files: ComponentFile[]) => {
   // 获取打包后的代码
   const bundledCode = bundleResult.outputFiles[0]!.text;
 
+  console.log("🚀 ~ compileTypescript ~ bundledCode:", bundledCode);
+
   // 使用 babel 编译打包后的代码
   const output = babelCompile(bundledCode, "bundle.js");
+
+  console.log("🚀 ~ compileTypescript ~ output:", output);
 
   // 配置Tailwind
   const tailwindConfig: TailwindConfig = {
