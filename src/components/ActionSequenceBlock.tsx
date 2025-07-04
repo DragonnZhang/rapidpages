@@ -62,7 +62,10 @@ export const ActionSequenceBlock: React.FC<ActionSequenceBlockProps> = ({
       >
         <ClockIcon className="h-3 w-3 text-indigo-600" />
         <span className="text-xs font-medium">
-          {title || `操作序列 (${actions.length}项)`}
+          {title ||
+            `操作序列 (${actions.length}${
+              actions.length > 1 ? " items" : " item"
+            })`}
         </span>
         {hasMultipleActions &&
           (isExpanded ? (

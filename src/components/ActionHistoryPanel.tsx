@@ -73,7 +73,9 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
           context: `操作数量: ${sequenceActions.length}`,
         });
 
-        const sequenceName = `${result.description}（${sequenceActions.length}项）`;
+        const sequenceName = `${result.description}（${
+          sequenceActions.length
+        } ${sequenceActions.length > 1 ? "items" : "item"}）`;
 
         const event = new CustomEvent("actionSequenceDrop", {
           detail: {
@@ -86,7 +88,9 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       } catch (error) {
         console.error("生成操作序列描述失败:", error);
         // 使用默认名称作为后备
-        const sequenceName = `操作序列（${sequenceActions.length}项）`;
+        const sequenceName = `操作序列（${sequenceActions.length}${
+          sequenceActions.length > 1 ? " items" : " item"
+        }）`;
         const event = new CustomEvent("actionSequenceDrop", {
           detail: {
             type: "action-sequence",
@@ -224,7 +228,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
                     </p>
                     {action.inputValue && action.type === "input" && (
                       <p className="mt-1 truncate rounded bg-gray-100 px-2 py-1 text-xs text-gray-600">
-                        完整内容: {action.inputValue}
+                        Input content: {action.inputValue}
                       </p>
                     )}
                   </div>
@@ -241,7 +245,8 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({
       {/* 底部说明 */}
       <div className="border-t border-gray-200 px-4 py-2">
         <p className="text-xs text-gray-500">
-          点击添加单个操作，Ctrl/Cmd+点击可多选创建AI描述的操作序列
+          Click to add a single action, Ctrl/Cmd+click to multi-select and
+          create an AI-described sequence of actions
         </p>
       </div>
     </div>

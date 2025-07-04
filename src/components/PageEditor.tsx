@@ -37,11 +37,9 @@ export const PageEditor = ({ code }: MyProps) => {
     let description = "";
 
     if (type === "input") {
-      description = `在 <${tagName}> 输入`;
+      description = `Input <${tagName}>`;
       if (elementId) {
         description += ` (id: ${elementId})`;
-      } else if (elementClass) {
-        description += ` (class: ${elementClass.split(" ")[0]})`;
       }
       if (inputValue) {
         description += ` - "${
@@ -53,10 +51,10 @@ export const PageEditor = ({ code }: MyProps) => {
     } else {
       description = `${
         type === "rightclick"
-          ? "右键点击"
+          ? "Right-click"
           : type === "doubleclick"
-          ? "双击"
-          : "点击"
+          ? "Double-click"
+          : "Click"
       } <${tagName}>`;
 
       if (elementText) {
@@ -113,11 +111,9 @@ export const PageEditor = ({ code }: MyProps) => {
     if (isSameElement && currentInputActionRef.current) {
       console.log("🚀 ~ Updating existing input record");
       // 更新现有记录的描述和输入值
-      let description = `在 <${tagName}> 输入`;
+      let description = `Input <${tagName}>`;
       if (elementId) {
         description += ` (id: ${elementId})`;
-      } else if (elementClass) {
-        description += ` (class: ${elementClass.split(" ")[0]})`;
       }
       if (value) {
         description += ` - "${
@@ -144,11 +140,9 @@ export const PageEditor = ({ code }: MyProps) => {
     } else {
       console.log("🚀 ~ Creating new input record");
       // 只有在不是连续输入的情况下才创建新记录
-      let description = `在 <${tagName}> 输入`;
+      let description = `Input <${tagName}>`;
       if (elementId) {
         description += ` (id: ${elementId})`;
-      } else if (elementClass) {
-        description += ` (class: ${elementClass.split(" ")[0]})`;
       }
       if (value) {
         description += ` - "${
@@ -473,7 +467,9 @@ export const PageEditor = ({ code }: MyProps) => {
       const result = await generateDescriptionMutation.mutateAsync({
         type: "element",
         content: element.outerHTML,
-        context: `标签类型: ${tagName}, 文本内容: ${element.textContent?.trim() || "无"}`,
+        context: `标签类型: ${tagName}, 文本内容: ${
+          element.textContent?.trim() || "无"
+        }`,
       });
 
       const elementName = result.description;
@@ -549,7 +545,7 @@ export const PageEditor = ({ code }: MyProps) => {
           title={isElementSelectMode ? "取消选择元素 (ESC)" : "选择页面元素"}
         >
           <CursorArrowRaysIcon className="mr-1 h-4 w-4" />
-          {isElementSelectMode ? "取消选择" : "选择元素"}
+          {isElementSelectMode ? "Cancel" : "Select"}
         </button>
       </div>
 

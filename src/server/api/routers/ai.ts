@@ -43,30 +43,30 @@ export const aiRouter = createTRPCRouter({
 
       if (type === "element") {
         systemPrompt = [
-          "你是一个前端开发专家，需要为HTML元素生成简短的功能描述。",
-          "描述应该简洁明了，通常是2-4个字的中文词组，例如：登录按钮、搜索框、导航栏、用户头像等。",
-          "只返回描述文本，不要包含任何其他内容。",
+          "You are a frontend development expert who needs to generate brief functional descriptions for HTML elements.",
+          "Descriptions should be concise and clear, typically 2-4 word English phrases, such as: Login Button, Search Box, Navigation Bar, User Avatar, etc.",
+          "Only return the description text, without any other content.",
         ].join("\n");
 
         userPrompt = [
-          "请为以下HTML元素生成一个简短的功能描述：",
+          "Please generate a brief functional description for the following HTML element:",
           "```html",
           content,
           "```",
-          context ? `上下文信息：${context}` : "",
+          context ? `Context information: ${context}` : "",
         ].join("\n");
       } else if (type === "action-sequence") {
         systemPrompt = [
-          "你是一个用户体验分析专家，需要为用户操作序列生成简短的描述。",
-          "描述应该概括用户的主要操作意图，例如：填写表单、搜索商品、登录操作、编辑内容等。",
-          "描述应该在6-10个字以内，使用中文，突出操作的核心目的。",
-          "只返回描述文本，不要包含任何其他内容。",
+          "You are a user experience analysis expert who needs to generate brief descriptions for user action sequences.",
+          "Descriptions should summarize the user's main operational intent, such as: Form Filling, Product Search, Login Process, Content Editing, etc.",
+          "Descriptions should be within 2-6 words in English, highlighting the core purpose of the operation.",
+          "Only return the description text, without any other content.",
         ].join("\n");
 
         userPrompt = [
-          "请为以下用户操作序列生成一个简短的描述：",
+          "Please generate a brief description for the following user action sequence:",
           content,
-          context ? `上下文信息：${context}` : "",
+          context ? `Context information: ${context}` : "",
         ].join("\n");
       }
 
@@ -93,9 +93,9 @@ export const aiRouter = createTRPCRouter({
         console.error("AI描述生成失败:", error);
         // 返回默认描述
         if (type === "element") {
-          return { description: "页面元素" };
+          return { description: "Page Element" };
         } else {
-          return { description: "用户操作" };
+          return { description: "User Action" };
         }
       }
     }),
