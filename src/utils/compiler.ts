@@ -53,9 +53,11 @@ export const compileTypescript = async (files: ComponentFile[]) => {
   const mainComponents = files.filter((c) => c.isMain);
   const mainComponent =
     mainComponents.length > 0 ? mainComponents[0] : files[0];
+  console.log("🚀 ~ compileTypescript ~ mainComponent:", mainComponent);
   const mainComponentName = sanitizeIdentifier(
     mainComponent!.filename.replace(/\.tsx$/, ""),
   );
+  console.log("🚀 ~ compileTypescript ~ mainComponentName:", mainComponentName);
 
   // 创建入口文件内容
   const entryFileContent = `
@@ -88,6 +90,7 @@ export const compileTypescript = async (files: ComponentFile[]) => {
       ReactDOM.render(<App />, rootElement);
     }
   `;
+  console.log("🚀 ~ compileTypescript ~ entryFileContent:", entryFileContent);
 
   // 创建一个虚拟文件系统用于 esbuild
   const virtualFileSystem: Record<string, string> = {};
@@ -174,6 +177,8 @@ export const compileTypescript = async (files: ComponentFile[]) => {
       },
     ],
   });
+
+  console.log("🚀 ~ compileTypescript ~ bundleResult:", bundleResult);
 
   // 获取打包后的代码
   const bundledCode = bundleResult.outputFiles[0]!.text;
