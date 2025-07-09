@@ -111,11 +111,17 @@ export const compileTypescript = async (files: ComponentFile[]) => {
     bundle: true,
     write: false,
     format: "esm",
-    target: "es2015",
+    target: "es2020", // 提高到 es2020 减少 polyfill
+    platform: "browser", // 明确指定浏览器平台
     jsx: "transform",
     jsxFactory: "React.createElement",
     jsxFragment: "React.Fragment",
-    logLevel: "warning", // 显示更多日志以便调试
+    logLevel: "warning",
+    minify: false, // 关闭压缩以便调试
+    keepNames: true, // 保持函数名
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
     plugins: [
       {
         name: "virtual-files",
