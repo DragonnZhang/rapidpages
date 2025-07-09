@@ -15,9 +15,6 @@ export const PageEditor = ({ code }: MyProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [isElementSelectMode, setIsElementSelectMode] = useState(false);
-  const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(
-    null,
-  );
   const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
   const [showActionHistory, setShowActionHistory] = useState(false);
   const currentInputActionRef = useRef<ActionRecord | null>(null);
@@ -400,20 +397,17 @@ export const PageEditor = ({ code }: MyProps) => {
         ) {
           elementBelow.classList.add("element-selector-hover");
           currentHoveredElement = elementBelow;
-          setHoveredElement(elementBelow);
         } else {
           currentHoveredElement = null;
-          setHoveredElement(null);
         }
       }
     };
 
     // 鼠标离开覆盖层时移除高亮
-    const handleMouseLeave = (e: MouseEvent) => {
+    const handleMouseLeave = () => {
       if (currentHoveredElement) {
         currentHoveredElement.classList.remove("element-selector-hover");
         currentHoveredElement = null;
-        setHoveredElement(null);
       }
     };
 
@@ -449,7 +443,6 @@ export const PageEditor = ({ code }: MyProps) => {
   // 禁用元素选择模式
   const disableElementSelection = () => {
     setIsElementSelectMode(false);
-    setHoveredElement(null);
 
     const iframe = iframeRef.current;
     if (iframe && (iframe as any).elementSelectorCleanup) {
