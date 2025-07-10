@@ -65,14 +65,29 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
     placeholderSpan.contentEditable = "false";
     placeholderSpan.appendChild(badgeElement);
 
-    // 插入到光标位置
+    // 确保焦点在编辑器上，然后插入到末尾
+    editorRef.current.focus();
+
+    // 将光标移到编辑器末尾
     const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
+    if (selection) {
+      selection.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      range.collapse(false); // 移到末尾
+      selection.addRange(range);
+
+      // 插入badge
       range.deleteContents();
       range.insertNode(placeholderSpan);
+
+      // 在badge后面添加一个空格，并将光标放在空格后
+      const spaceNode = document.createTextNode(" ");
       range.setStartAfter(placeholderSpan);
-      range.setEndAfter(placeholderSpan);
+      range.insertNode(spaceNode);
+      range.setStartAfter(spaceNode);
+      range.setEndAfter(spaceNode);
+
       selection.removeAllRanges();
       selection.addRange(range);
     }
