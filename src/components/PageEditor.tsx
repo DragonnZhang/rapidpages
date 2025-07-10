@@ -1,38 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { compileTypescript, type ComponentFile } from "~/utils/compiler";
-import { ActionHistoryPanel } from "./ActionHistoryPanel";
 import { type ActionRecord } from "~/types/multimodal";
 import { api } from "~/utils/api";
+import { useAtom } from "jotai";
+import { actionHistoryAtom } from "~/store/actionHistoryStore";
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
   code: ComponentFile[];
   isElementSelectMode: boolean;
-  showActionHistory: boolean;
   onElementSelectModeChange: (mode: boolean) => void;
-  onActionHistoryToggle: (show: boolean) => void;
-  onActionHistoryCountChange: (count: number) => void;
 }
 
 export const PageEditor = ({
   code,
   isElementSelectMode,
-  showActionHistory,
   onElementSelectModeChange,
-  onActionHistoryToggle,
-  onActionHistoryCountChange,
 }: MyProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [dom, setDom] = useState<string | undefined>(undefined);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
+  const [, setActionHistory] = useAtom(actionHistoryAtom);
   const currentInputActionRef = useRef<ActionRecord | null>(null);
   const generateDescriptionMutation = api.ai.generateDescription.useMutation();
-
-  // 更新历史记录数量
-  useEffect(() => {
-    onActionHistoryCountChange(actionHistory.length);
-  }, [actionHistory.length, onActionHistoryCountChange]);
 
   // 添加操作记录
   const addActionRecord = (
@@ -521,15 +511,6 @@ export const PageEditor = ({
 
   return (
     <div className="absolute inset-0 flex justify-center">
-      {/* 操作历史面板 */}
-      {showActionHistory && (
-        <ActionHistoryPanel
-          actions={actionHistory}
-          onClose={() => onActionHistoryToggle(false)}
-          onClear={() => setActionHistory([])}
-        />
-      )}
-
       <div
         className="absolute inset-0 overflow-hidden rounded-b-lg"
         onWheel={handleScroll}
