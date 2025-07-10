@@ -40,10 +40,7 @@ export const ApplicationLayout = ({
             <div className="mx-auto px-8">
               <div className="flex h-16 justify-between">
                 <div className="flex">
-                  <Link
-                    href="https://www.rapidpages.com"
-                    className="flex flex-shrink-0 items-center"
-                  >
+                  <Link href="/" className="flex flex-shrink-0 items-center">
                     <Logo className="block h-8 w-auto lg:hidden" />
                     <Logo className="hidden h-8 w-auto lg:block" />
                   </Link>
