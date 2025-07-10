@@ -1,24 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 import { compileTypescript, type ComponentFile } from "~/utils/compiler";
-import { CursorArrowRaysIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { ActionHistoryPanel } from "./ActionHistoryPanel";
 import { type ActionRecord } from "~/types/multimodal";
 import { api } from "~/utils/api";
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
   code: ComponentFile[];
+  isElementSelectMode: boolean;
+  showActionHistory: boolean;
+  onElementSelectModeChange: (mode: boolean) => void;
+  onActionHistoryToggle: (show: boolean) => void;
+  onActionHistoryCountChange: (count: number) => void;
 }
 
-export const PageEditor = ({ code }: MyProps) => {
+export const PageEditor = ({
+  code,
+  isElementSelectMode,
+  showActionHistory,
+  onElementSelectModeChange,
+  onActionHistoryToggle,
+  onActionHistoryCountChange,
+}: MyProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [dom, setDom] = useState<string | undefined>(undefined);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [isElementSelectMode, setIsElementSelectMode] = useState(false);
   const [actionHistory, setActionHistory] = useState<ActionRecord[]>([]);
-  const [showActionHistory, setShowActionHistory] = useState(false);
   const currentInputActionRef = useRef<ActionRecord | null>(null);
   const generateDescriptionMutation = api.ai.generateDescription.useMutation();
+
+  // 更新历史记录数量
+  useEffect(() => {
+    onActionHistoryCountChange(actionHistory.length);
+  }, [actionHistory.length, onActionHistoryCountChange]);
 
   // 添加操作记录
   const addActionRecord = (
@@ -337,8 +351,6 @@ export const PageEditor = ({ code }: MyProps) => {
 
   // 启用元素选择模式
   const enableElementSelection = () => {
-    setIsElementSelectMode(true);
-
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) return;
 
@@ -420,7 +432,8 @@ export const PageEditor = ({ code }: MyProps) => {
         selectElement(currentHoveredElement);
       }
 
-      disableElementSelection();
+      // 选择完元素后自动退出选择模式
+      onElementSelectModeChange(false);
     };
 
     overlay.addEventListener("mousemove", handleMouseMove);
@@ -442,8 +455,6 @@ export const PageEditor = ({ code }: MyProps) => {
 
   // 禁用元素选择模式
   const disableElementSelection = () => {
-    setIsElementSelectMode(false);
-
     const iframe = iframeRef.current;
     if (iframe && (iframe as any).elementSelectorCleanup) {
       (iframe as any).elementSelectorCleanup();
@@ -499,54 +510,22 @@ export const PageEditor = ({ code }: MyProps) => {
     // scrollTop = iframeRef.current.scrollTop + event.deltaY;
   };
 
+  // 当外部状态变化时，同步内部逻辑
+  useEffect(() => {
+    if (isElementSelectMode) {
+      enableElementSelection();
+    } else {
+      disableElementSelection();
+    }
+  }, [isElementSelectMode]);
+
   return (
     <div className="absolute inset-0 flex justify-center">
-      {/* 操作按钮组 */}
-      <div className="absolute right-4 top-4 z-10 flex space-x-2">
-        {/* 历史记录按钮 */}
-        <button
-          onClick={() => setShowActionHistory(!showActionHistory)}
-          className={`
-            inline-flex items-center rounded-md px-3 py-2 text-sm font-medium shadow-sm
-            ${
-              showActionHistory
-                ? "bg-gray-600 text-white hover:bg-gray-700"
-                : "bg-gray-500 text-white hover:bg-gray-600"
-            }
-          `}
-          title={`${showActionHistory ? "隐藏" : "显示"}操作历史记录`}
-        >
-          <ClockIcon className="mr-1 h-4 w-4" />
-          History ({actionHistory.length})
-        </button>
-
-        {/* 元素选择按钮 */}
-        <button
-          onClick={
-            isElementSelectMode
-              ? disableElementSelection
-              : enableElementSelection
-          }
-          className={`
-            inline-flex items-center rounded-md px-3 py-2 text-sm font-medium shadow-sm
-            ${
-              isElementSelectMode
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }
-          `}
-          title={isElementSelectMode ? "取消选择元素 (ESC)" : "选择页面元素"}
-        >
-          <CursorArrowRaysIcon className="mr-1 h-4 w-4" />
-          {isElementSelectMode ? "Cancel" : "Select"}
-        </button>
-      </div>
-
       {/* 操作历史面板 */}
       {showActionHistory && (
         <ActionHistoryPanel
           actions={actionHistory}
-          onClose={() => setShowActionHistory(false)}
+          onClose={() => onActionHistoryToggle(false)}
           onClear={() => setActionHistory([])}
         />
       )}

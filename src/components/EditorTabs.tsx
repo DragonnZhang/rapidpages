@@ -10,6 +10,8 @@ import { CodePanel } from "~/components/CodePanel";
 import {
   ArrowUpTrayIcon,
   DocumentDuplicateIcon,
+  CursorArrowRaysIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -26,6 +28,9 @@ export const EditorTabs = ({
   revisionId: string;
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isElementSelectMode, setIsElementSelectMode] = useState(false);
+  const [showActionHistory, setShowActionHistory] = useState(false);
+  const [actionHistoryCount, setActionHistoryCount] = useState(0);
   const { tabs } = useComponentProvider();
 
   // If a tab is active find the active tab index
@@ -34,6 +39,14 @@ export const EditorTabs = ({
   const activeTabIndex = activeTab ? tabs.indexOf(activeTab) + 1 : 0;
 
   const forkRevision = api.component.forkRevision.useMutation();
+
+  const handleElementSelectToggle = () => {
+    setIsElementSelectMode(!isElementSelectMode);
+  };
+
+  const handleHistoryToggle = () => {
+    setShowActionHistory(!showActionHistory);
+  };
 
   return (
     <Tab.Group selectedIndex={selectedIndex}>
@@ -90,6 +103,47 @@ export const EditorTabs = ({
           </Tab>
         </Tab.List>
         <div className="ml-auto flex items-center gap-2">
+          {/* Canvas 模式下显示的操作按钮 */}
+          {selectedIndex === 0 && (
+            <>
+              {/* 历史记录按钮 */}
+              <button
+                onClick={handleHistoryToggle}
+                className={`
+                  inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium shadow-sm
+                  ${
+                    showActionHistory
+                      ? "bg-gray-600 text-white hover:bg-gray-700"
+                      : "bg-gray-500 text-white hover:bg-gray-600"
+                  }
+                `}
+                title={`${showActionHistory ? "隐藏" : "显示"}操作历史记录`}
+              >
+                <ClockIcon className="mr-2 h-4 w-4" />
+                History ({actionHistoryCount})
+              </button>
+
+              {/* 元素选择按钮 */}
+              <button
+                onClick={handleElementSelectToggle}
+                className={`
+                  inline-flex items-center rounded-md px-2.5 py-1.5 text-sm font-medium shadow-sm
+                  ${
+                    isElementSelectMode
+                      ? "bg-red-600 text-white hover:bg-red-700"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }
+                `}
+                title={
+                  isElementSelectMode ? "取消选择元素 (ESC)" : "选择页面元素"
+                }
+              >
+                <CursorArrowRaysIcon className="mr-2 h-4 w-4" />
+                {isElementSelectMode ? "Cancel" : "Select"}
+              </button>
+            </>
+          )}
+
           <Link
             href="/new"
             type="button"
@@ -155,7 +209,14 @@ export const EditorTabs = ({
       <div className="h-1 w-full rounded-t-lg border border-b-0 border-gray-300 bg-gray-200" />
       <Tab.Panels className="h-full pb-3">
         <Tab.Panel key={0} className="flex h-full flex-col">
-          <PagePanel code={code} />
+          <PagePanel
+            code={code}
+            isElementSelectMode={isElementSelectMode}
+            showActionHistory={showActionHistory}
+            onElementSelectModeChange={setIsElementSelectMode}
+            onActionHistoryToggle={setShowActionHistory}
+            onActionHistoryCountChange={setActionHistoryCount}
+          />
         </Tab.Panel>
         <Tab.Panel key={1} className="flex h-full max-h-full flex-col">
           <CodePanel code={code} />

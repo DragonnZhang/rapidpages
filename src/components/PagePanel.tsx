@@ -1,12 +1,33 @@
-import { PageEditor } from "~/components/PageEditor";
 import { type ComponentFile } from "~/utils/compiler";
+import { PageEditor } from "./PageEditor";
 
-export const PagePanel = ({ code }: { code: ComponentFile[] }) => {
+interface PagePanelProps {
+  code: ComponentFile[];
+  isElementSelectMode: boolean;
+  showActionHistory: boolean;
+  onElementSelectModeChange: (mode: boolean) => void;
+  onActionHistoryToggle: (show: boolean) => void;
+  onActionHistoryCountChange: (count: number) => void;
+}
+
+export const PagePanel = ({
+  code,
+  isElementSelectMode,
+  showActionHistory,
+  onElementSelectModeChange,
+  onActionHistoryToggle,
+  onActionHistoryCountChange,
+}: PagePanelProps) => {
   return (
-    <>
-      <div className="relative flex h-full w-full rounded-b-lg border border-t-0 border-gray-300 bg-gray-200">
-        <PageEditor code={code} />
-      </div>
-    </>
+    <div className="relative h-full">
+      <PageEditor
+        code={code}
+        isElementSelectMode={isElementSelectMode}
+        showActionHistory={showActionHistory}
+        onElementSelectModeChange={onElementSelectModeChange}
+        onActionHistoryToggle={onActionHistoryToggle}
+        onActionHistoryCountChange={onActionHistoryCountChange}
+      />
+    </div>
   );
 };
