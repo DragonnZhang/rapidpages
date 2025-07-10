@@ -6,6 +6,7 @@ import {
 import { type ActionRecord } from "~/types/multimodal";
 import { api } from "~/utils/api";
 import { TrashIcon } from "@heroicons/react/24/outline";
+import { useEffect, useRef } from "react";
 
 export const ActionTimeline = () => {
   const [actions, setActions] = useAtom(actionHistoryAtom);
@@ -13,6 +14,15 @@ export const ActionTimeline = () => {
     selectedActionIdsAtom,
   );
   const generateDescriptionMutation = api.ai.generateDescription.useMutation();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      // Scroll to the far right to show the latest item
+      scrollContainerRef.current.scrollLeft =
+        scrollContainerRef.current.scrollWidth;
+    }
+  }, [actions]);
 
   const handleActionClick = async (
     action: ActionRecord,
@@ -114,7 +124,10 @@ export const ActionTimeline = () => {
       <div className="flex-shrink-0 text-sm font-medium text-gray-600">
         History:
       </div>
-      <div className="relative min-w-0 flex-1 overflow-x-auto">
+      <div
+        ref={scrollContainerRef}
+        className="relative min-w-0 flex-1 overflow-x-auto"
+      >
         <div className="inline-block min-w-full">
           <div className="relative flex items-center py-12">
             {/* The timeline line */}
@@ -122,40 +135,45 @@ export const ActionTimeline = () => {
 
             {/* Action nodes */}
             <div className="relative flex items-center px-8">
-              {actions.map((action, index) => {
-                const isFirst = index === 0;
-                const isLast = index === actions.length - 1;
+              {actions
+                .slice()
+                .reverse()
+                .map((action, index) => {
+                  const isFirst = index === 0;
+                  const isLast = index === actions.length - 1;
 
-                // Adjust label alignment for first and last items
-                let alignmentClass = "left-1/2 -translate-x-1/2"; // Default: center
-                if (actions.length === 1) {
-                  alignmentClass = "left-0"; // Single item: align left
-                } else if (isFirst) {
-                  alignmentClass = "left-0"; // First item of many: align left
-                } else if (isLast) {
-                  alignmentClass = "right-0"; // Last item of many: align right
-                }
+                  // Adjust label alignment for first and last items
+                  let alignmentClass = "left-1/2 -translate-x-1/2"; // Default: center
+                  if (actions.length === 1) {
+                    alignmentClass = "left-0"; // Single item: align left
+                  } else if (isFirst) {
+                    alignmentClass = "left-0"; // First item of many: align left
+                  } else if (isLast) {
+                    alignmentClass = "right-0"; // Last item of many: align right
+                  }
 
-                // Dynamically calculate margin based on description length
-                const baseMargin = 4; // Base margin in rem (1rem = 16px)
-                const charFactor = 0.4; // Additional margin per character in rem
-                const dynamicMargin =
-                  baseMargin + action.description.length * charFactor;
+                  // Dynamically calculate margin based on description length
+                  const baseMargin = 4; // Base margin in rem (1rem = 16px)
+                  const charFactor = 0.4; // Additional margin per character in rem
+                  const dynamicMargin =
+                    baseMargin + action.description.length * charFactor;
 
-                return (
-                  <div
-                    key={action.id}
-                    className="group relative flex flex-col items-center"
-                    onClick={(e) => handleActionClick(action, e)}
-                    title={action.description}
-                    style={{
-                      marginRight:
-                        index < actions.length - 1 ? `${dynamicMargin}rem` : 0,
-                    }}
-                  >
-                    {/* Dot on the timeline */}
+                  return (
                     <div
-                      className={`
+                      key={action.id}
+                      className="group relative flex flex-col items-center"
+                      onClick={(e) => handleActionClick(action, e)}
+                      title={action.description}
+                      style={{
+                        marginRight:
+                          index < actions.length - 1
+                            ? `${dynamicMargin}rem`
+                            : 0,
+                      }}
+                    >
+                      {/* Dot on the timeline */}
+                      <div
+                        className={`
                   z-10 h-4 w-4 cursor-pointer rounded-full border-2 transition-all
                   ${
                     selectedActionIds.includes(action.id)
@@ -163,11 +181,11 @@ export const ActionTimeline = () => {
                       : "border-gray-400 bg-white group-hover:bg-gray-200"
                   }
                 `}
-                    ></div>
+                      ></div>
 
-                    {/* Action content - Staggered top and bottom */}
-                    <div
-                      className={`
+                      {/* Action content - Staggered top and bottom */}
+                      <div
+                        className={`
                   absolute flex w-max max-w-xs cursor-pointer items-center gap-2 rounded-md border bg-white px-2 py-1 shadow-sm transition-colors
                   ${index % 2 === 0 ? "-top-10" : "top-7"}
                   ${alignmentClass}
@@ -177,17 +195,17 @@ export const ActionTimeline = () => {
                       : "border-gray-300 group-hover:bg-gray-50"
                   }
                 `}
-                    >
-                      <span className="text-base">
-                        {getActionIcon(action.type)}
-                      </span>
-                      <span className="truncate text-sm text-gray-800">
-                        {action.description}
-                      </span>
+                      >
+                        <span className="text-base">
+                          {getActionIcon(action.type)}
+                        </span>
+                        <span className="truncate text-sm text-gray-800">
+                          {action.description}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
