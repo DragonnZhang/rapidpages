@@ -120,7 +120,7 @@ export const ActionTimeline = () => {
   }
 
   return (
-    <div className="mb-2 mt-3 flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2">
+    <div className="mt-3 flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-1">
       <div className="flex-shrink-0 text-sm font-medium text-gray-600">
         History:
       </div>

@@ -729,7 +729,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                 添加内容
               </label>
 
-              <div className="relative min-h-[120px]">
+              <div className="relative min-h-[80px]">
                 {/* 使用 contentEditable div 替代 textarea */}
                 <div
                   ref={editorRef}
@@ -741,7 +741,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                     fontSize: "0.875rem",
                     lineHeight: "1.5rem",
                     color: "#111827",
-                    minHeight: "120px",
+                    minHeight: "80px",
                   }}
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}

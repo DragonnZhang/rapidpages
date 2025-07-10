@@ -36,7 +36,7 @@ export const SideMenu = ({ revisions }: { revisions: ComponentRevision[] }) => {
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-1 justify-between space-x-2 pt-1.5">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm text-gray-500">{`Created ${formatDistance(
                           revision.createdAt,
                           new Date(),
