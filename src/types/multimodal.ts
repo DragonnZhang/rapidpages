@@ -4,6 +4,7 @@ export interface MediaItem {
   url: string; // 对于element类型，这里存储元素的HTML内容
   name: string;
   size?: number;
+  actions?: ActionRecord[]; // 新增：用于存储操作序列
 }
 
 export interface RichTextContent {

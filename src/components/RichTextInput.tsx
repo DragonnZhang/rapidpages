@@ -100,10 +100,11 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
         container.style.display = "inline-block";
         container.style.verticalAlign = "middle";
         container.style.margin = "0 2px";
+        container.style.position = "relative"; // For positioning the expanded list
 
         const actionBlock = document.createElement("div");
         actionBlock.className =
-          "inline-flex items-center gap-1 rounded-md border border-yellow-200 bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800";
+          "inline-flex cursor-pointer items-center gap-1 rounded-md border border-yellow-200 bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800";
 
         // 创建图标
         const iconSvg = document.createElementNS(
@@ -134,6 +135,26 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
         const textSpan = document.createElement("span");
         textSpan.textContent = badge.displayName || badge.filename;
         actionBlock.appendChild(textSpan);
+
+        // 创建展开/折叠箭头图标
+        const arrowSvg = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "svg",
+        );
+        arrowSvg.setAttribute("class", "ml-1 h-3 w-3 transition-transform");
+        arrowSvg.setAttribute("fill", "none");
+        arrowSvg.setAttribute("stroke", "currentColor");
+        arrowSvg.setAttribute("viewBox", "0 0 24 24");
+        const arrowPath = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        arrowPath.setAttribute("stroke-linecap", "round");
+        arrowPath.setAttribute("stroke-linejoin", "round");
+        arrowPath.setAttribute("stroke-width", "2");
+        arrowPath.setAttribute("d", "M19 9l-7 7-7-7");
+        arrowSvg.appendChild(arrowPath);
+        actionBlock.appendChild(arrowSvg);
 
         // 创建删除按钮
         const removeButton = document.createElement("button");
@@ -171,6 +192,56 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
         actionBlock.appendChild(removeButton);
         container.appendChild(actionBlock);
+
+        const getActionIcon = (type: string) => {
+          switch (type) {
+            case "click":
+              return "👆";
+            case "rightclick":
+              return "👉";
+            case "doubleclick":
+              return "👆👆";
+            case "input":
+              return "⌨️";
+            default:
+              return "📱";
+          }
+        };
+
+        // 点击事件处理函数
+        actionBlock.addEventListener("click", () => {
+          const existingDetails = container.querySelector(
+            ".action-sequence-details",
+          );
+          if (existingDetails) {
+            existingDetails.remove();
+            arrowSvg.classList.remove("rotate-180");
+          } else {
+            const detailsList = document.createElement("ul");
+            detailsList.className =
+              "action-sequence-details absolute z-10 mt-1 w-max list-none rounded-md border border-gray-200 bg-white p-2 shadow-lg";
+
+            badge.actionSequence?.forEach((action) => {
+              const listItem = document.createElement("li");
+              listItem.className =
+                "flex items-center gap-2 py-1 text-xs text-gray-700";
+
+              const iconSpan = document.createElement("span");
+              iconSpan.className = "text-sm";
+              iconSpan.textContent = getActionIcon(action.type);
+
+              const descSpan = document.createElement("span");
+              descSpan.textContent = action.description;
+
+              listItem.appendChild(iconSpan);
+              listItem.appendChild(descSpan);
+              detailsList.appendChild(listItem);
+            });
+            container.appendChild(detailsList);
+            arrowSvg.classList.add("rotate-180");
+          }
+        });
+
         return container;
       } else {
         const getBadgeIcon = () => {
@@ -574,6 +645,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
         url: JSON.stringify(sequenceData.actions),
         name: sequenceData.name,
         size: sequenceData.actions.length,
+        actions: sequenceData.actions, // 存储操作序列
       };
 
       setMedia((prev) => [...prev, mediaItem]);
