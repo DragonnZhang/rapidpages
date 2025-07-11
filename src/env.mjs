@@ -24,6 +24,7 @@ export const env = createEnv({
     DEEPSEEK_API_KEY: z.string(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string(),
     DASHSCOPE_API_KEY: z.string(),
+    DOUBAO_API_KEY: z.string(),
 
     MODEL_NAME: z.string().default("deepseek-V3"),
 
@@ -69,6 +70,7 @@ export const env = createEnv({
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY,
+    DOUBAO_API_KEY: process.env.DOUBAO_API_KEY,
 
     MODEL_NAME: process.env.MODEL_NAME,
 
