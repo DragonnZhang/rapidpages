@@ -14,8 +14,10 @@ const initEsbuild = async () => {
     esbuildInitPromise = esbuild
       .initialize({
         // 使用特定版本的esbuild-wasm，该版本更稳定
+        // 这里使用的是国内的 CDN，因为 jsdelivr 在国内可能会有访问问题
+        // 但是问题在于可用性不高
         wasmURL:
-          "https://cdn.jsdelivr.net/npm/esbuild-wasm@0.25.4/esbuild.wasm",
+          "https://cdn.jsdmirror.com/npm/esbuild-wasm@0.25.4/esbuild.wasm",
         // 允许worker线程运行
         worker: false,
       })
