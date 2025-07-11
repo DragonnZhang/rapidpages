@@ -1,6 +1,8 @@
 import { env } from "~/env.mjs";
-import { deepseek } from "@ai-sdk/deepseek";
+import { deepseek, createDeepSeek } from "@ai-sdk/deepseek";
 import { createOpenAI } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
+import { qwen } from "qwen-ai-provider";
 import { generateText } from "ai";
 import { setGlobalDispatcher, Agent } from "undici";
 import { type ComponentFile } from "~/utils/compiler";
@@ -12,6 +14,12 @@ function getModelByName(modelName: string) {
   console.log("🚀 ~ getModelByName ~ modelName:", modelName);
   if (modelName.startsWith("deepseek-")) {
     return deepseek(modelName);
+
+    // 暂时先改成用阿里托管的 DeepSeek，因为直到 7 月底免费，并且速度可能更快
+    // return createDeepSeek({
+    // baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    // apiKey: env.DASHSCOPE_API_KEY,
+    // })(modelName);
   } else if (modelName.startsWith("gpt-")) {
     return createOpenAI({
       baseURL: "https://use.52apikey.cn/v1",
@@ -22,6 +30,11 @@ function getModelByName(modelName: string) {
       baseURL: "https://api.mjdjourney.cn/v1",
       apiKey: env.ANTHROPIC_API_KEY,
     })(modelName);
+  } else if (modelName.startsWith("gemini-")) {
+    return google(modelName);
+  } else if (modelName.startsWith("qwen-")) {
+    // 不知道为什么暂时用不了，说是鉴权失败
+    return qwen(modelName);
   } else {
     // 默认使用 deepseek 作为后备选项
     console.warn(`未知模型前缀: ${modelName}，使用 deepseek-chat 作为默认值`);
