@@ -1,28 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { env } from "~/env.mjs";
-import { deepseek } from "@ai-sdk/deepseek";
-import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
-
-// 根据 MODEL_NAME 前缀选择合适的模型
-function getModelByName(modelName: string) {
-  if (modelName.startsWith("deepseek-")) {
-    return deepseek(modelName);
-  } else if (modelName.startsWith("gpt-")) {
-    return createOpenAI({
-      baseURL: "https://use.52apikey.cn/v1",
-      apiKey: env.OPENAI_API_KEY,
-    })(modelName);
-  } else if (modelName.startsWith("claude-")) {
-    return createOpenAI({
-      baseURL: "https://api.mjdjourney.cn/v1",
-      apiKey: env.ANTHROPIC_API_KEY,
-    })(modelName);
-  } else {
-    return deepseek("deepseek-chat");
-  }
-}
+import { getModelByName } from "~/utils/utils";
 
 const model = getModelByName(env.MODEL_NAME);
 
