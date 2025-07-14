@@ -73,7 +73,7 @@ export const compileTypescript = async (files: ComponentFile[]) => {
       })
       .join("\n")}
 
-    const App = () => {
+    const MyApp = () => {
       return (
         <>
           <${mainComponentName} />
@@ -86,10 +86,10 @@ export const compileTypescript = async (files: ComponentFile[]) => {
     // 检测是否支持React 18的createRoot API
     if (typeof ReactDOM.createRoot === 'function') {
       // React 18+
-      ReactDOM.createRoot(rootElement).render(<App />);
+      ReactDOM.createRoot(rootElement).render(<MyApp />);
     } else {
       // React 17及以下
-      ReactDOM.render(<App />, rootElement);
+      ReactDOM.render(<MyApp />, rootElement);
     }
   `;
   console.log("🚀 ~ compileTypescript ~ entryFileContent:", entryFileContent);
