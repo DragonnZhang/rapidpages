@@ -3,6 +3,8 @@ import { generateText } from "ai";
 import { setGlobalDispatcher, Agent } from "undici";
 import { type ComponentFile } from "~/utils/compiler";
 import { getModelByName } from "~/utils/utils";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 setGlobalDispatcher(new Agent({ connect: { timeout: 200000_000 } }));
 
@@ -51,6 +53,12 @@ export async function reviseComponent(
   code: ComponentFile[],
   media?: MediaItem[],
 ): Promise<ComponentFile[]> {
+  // 检查是否需要使用 mock 数据
+  if (prompt.startsWith("请直接返回下面的内容")) {
+    console.log("检测到 mock 请求，返回 prompt.txt 内容");
+    return getMockComponentFiles();
+  }
+
   // 准备系统提示
   let codeDisplay = "";
 
@@ -287,6 +295,12 @@ export async function generateNewComponent(
   prompt: string,
   media?: MediaItem[],
 ): Promise<ComponentFile[]> {
+  // 检查是否需要使用 mock 数据
+  if (prompt.startsWith("请直接返回下面的内容")) {
+    console.log("检测到 mock 请求，返回 prompt.txt 内容");
+    return getMockComponentFiles();
+  }
+
   // 准备媒体信息
   let mediaContext = "";
   if (media && media.length > 0) {
@@ -471,4 +485,30 @@ export async function generateNewComponent(
     multiFiles.length,
   );
   return multiFiles;
+}
+
+/**
+ * 获取 mock 组件文件数据
+ * 从 prompt.txt 中提取多文件组件
+ */
+function getMockComponentFiles(): ComponentFile[] {
+  try {
+    // 读取 prompt.txt 文件内容
+    const promptFilePath = join(process.cwd(), "prompt.txt");
+    const promptContent = readFileSync(promptFilePath, "utf-8");
+
+    // 使用现有的提取函数解析多文件代码块
+    const multiFiles = extractMultipleCodeBlocks(promptContent);
+
+    if (!multiFiles) {
+      console.warn("无法从 prompt.txt 中提取多文件组件");
+      throw new Error("无法从 prompt.txt 中提取多文件组件");
+    }
+
+    console.log("成功从 prompt.txt 中提取多文件组件:", multiFiles.length);
+    return multiFiles;
+  } catch (error) {
+    console.error("读取 prompt.txt 文件失败:", error);
+    throw new Error("无法读取 mock 数据文件");
+  }
 }
