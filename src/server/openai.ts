@@ -11,7 +11,7 @@ setGlobalDispatcher(new Agent({ connect: { timeout: 200000_000 } }));
 const model = getModelByName(env.MODEL_NAME);
 
 const options = {
-  // maxTokens: 32768,
+  maxTokens: 32768,
 };
 
 /**
