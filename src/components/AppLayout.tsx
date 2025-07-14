@@ -64,6 +64,8 @@ export const ApplicationLayout = ({
                     </div>
                   )}
                 </div>
+
+                {/* 登录状态下的用户菜单 */}
                 {session && (
                   <div className="hidden sm:ml-6 sm:flex sm:items-center">
                     {/* Profile dropdown */}
@@ -136,9 +138,32 @@ export const ApplicationLayout = ({
                   </div>
                 )}
 
-                {session && (
-                  <div className="-mr-2 flex items-center sm:hidden">
-                    {/* Mobile menu button */}
+                {/* 未登录状态下的登录按钮 */}
+                {!session && (
+                  <div className="hidden sm:ml-6 sm:flex sm:items-center">
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    >
+                      Login
+                    </Link>
+                  </div>
+                )}
+
+                {/* 移动端菜单按钮 */}
+                <div className="-mr-2 flex items-center sm:hidden">
+                  {/* 未登录状态下的移动端登录按钮 */}
+                  {!session && (
+                    <Link
+                      href="/login"
+                      className="mr-2 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                    >
+                      Login
+                    </Link>
+                  )}
+
+                  {/* 登录后的移动端菜单按钮 */}
+                  {session && (
                     <Disclosure.Button className="inline-flex items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                       <span className="sr-only">Open main menu</span>
                       {open ? (
@@ -153,8 +178,8 @@ export const ApplicationLayout = ({
                         />
                       )}
                     </Disclosure.Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
             <Disclosure.Panel className="sm:hidden">
