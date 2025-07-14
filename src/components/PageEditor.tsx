@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { compileTypescript, type ComponentFile } from "~/utils/compiler";
 import { type ActionRecord } from "~/types/multimodal";
 import { api } from "~/utils/api";
@@ -25,154 +25,160 @@ export const PageEditor = ({
   const generateDescriptionMutation = api.ai.generateDescription.useMutation();
 
   // 添加操作记录
-  const addActionRecord = (
-    type: "click" | "rightclick" | "doubleclick" | "input",
-    element: HTMLElement,
-    inputValue?: string,
-  ) => {
-    const tagName = element.tagName.toLowerCase();
-    const elementText = element.textContent?.trim().substring(0, 50) || "";
-    const elementClass = element.className || "";
-    const elementId = element.id || "";
+  const addActionRecord = useCallback(
+    (
+      type: "click" | "rightclick" | "doubleclick" | "input",
+      element: HTMLElement,
+      inputValue?: string,
+    ) => {
+      const tagName = element.tagName.toLowerCase();
+      const elementText = element.textContent?.trim().substring(0, 50) || "";
+      const elementClass = element.className || "";
+      const elementId = element.id || "";
 
-    let description = "";
+      let description = "";
 
-    if (type === "input") {
-      description = `Input <${tagName}>`;
-      if (elementId) {
-        description += ` (id: ${elementId})`;
-      }
-      if (inputValue) {
-        description += ` - "${
-          inputValue.length > 30
-            ? inputValue.substring(0, 30) + "..."
-            : inputValue
-        }"`;
-      }
-    } else {
-      description = `${
-        type === "rightclick"
-          ? "Right-click"
-          : type === "doubleclick"
-          ? "Double-click"
-          : "Click"
-      } <${tagName}>`;
+      if (type === "input") {
+        description = `Input <${tagName}>`;
+        if (elementId) {
+          description += ` (id: ${elementId})`;
+        }
+        if (inputValue) {
+          description += ` - "${
+            inputValue.length > 30
+              ? inputValue.substring(0, 30) + "..."
+              : inputValue
+          }"`;
+        }
+      } else {
+        description = `${
+          type === "rightclick"
+            ? "Right-click"
+            : type === "doubleclick"
+            ? "Double-click"
+            : "Click"
+        } <${tagName}>`;
 
-      if (elementText) {
-        description += ` - "${elementText}"`;
-      }
-    }
-
-    const record: ActionRecord = {
-      id: Math.random().toString(36).substring(2, 15),
-      timestamp: Date.now(),
-      type,
-      elementTag: tagName,
-      elementText,
-      elementClass,
-      elementId,
-      description,
-      inputValue,
-    };
-
-    console.log("🚀 ~ addActionRecord ~ record:", record);
-    setActionHistory((prev) => [record, ...prev].slice(0, 50));
-
-    return record; // 返回创建的记录
-  };
-
-  // 处理输入操作（使用 useRef 管理状态）
-  const handleInputAction = (element: HTMLElement, value: string) => {
-    const tagName = element.tagName.toLowerCase();
-    const elementId = element.id || "";
-    const elementClass = element.className || "";
-
-    console.log(
-      "🚀 ~ handleInputAction ~ currentInputActionRef.current:",
-      currentInputActionRef.current,
-    );
-    console.log(
-      "🚀 ~ handleInputAction ~ tagName:",
-      tagName,
-      "elementId:",
-      elementId,
-      "elementClass:",
-      elementClass,
-    );
-
-    // 检查是否是同一个输入框的连续输入
-    const isSameElement =
-      currentInputActionRef.current &&
-      currentInputActionRef.current.elementTag === tagName &&
-      currentInputActionRef.current.elementId === elementId &&
-      currentInputActionRef.current.elementClass === elementClass;
-
-    console.log("🚀 ~ handleInputAction ~ isSameElement:", isSameElement);
-
-    if (isSameElement && currentInputActionRef.current) {
-      console.log("🚀 ~ Updating existing input record");
-      // 更新现有记录的描述和输入值
-      let description = `Input <${tagName}>`;
-      if (elementId) {
-        description += ` (id: ${elementId})`;
-      }
-      if (value) {
-        description += ` - "${
-          value.length > 30 ? value.substring(0, 30) + "..." : value
-        }"`;
+        if (elementText) {
+          description += ` - "${elementText}"`;
+        }
       }
 
-      const updatedAction: ActionRecord = {
-        ...currentInputActionRef.current,
-        timestamp: Date.now(),
-        inputValue: value,
-        description,
-      };
-
-      // 更新 ref 和状态
-      currentInputActionRef.current = updatedAction;
-
-      // 更新历史记录中的对应项（保持在原位置）
-      setActionHistory((prev) =>
-        prev.map((action) =>
-          action.id === updatedAction.id ? updatedAction : action,
-        ),
-      );
-    } else {
-      console.log("🚀 ~ Creating new input record");
-      // 只有在不是连续输入的情况下才创建新记录
-      let description = `Input <${tagName}>`;
-      if (elementId) {
-        description += ` (id: ${elementId})`;
-      }
-      if (value) {
-        description += ` - "${
-          value.length > 30 ? value.substring(0, 30) + "..." : value
-        }"`;
-      }
-
-      const newRecord: ActionRecord = {
+      const record: ActionRecord = {
         id: Math.random().toString(36).substring(2, 15),
         timestamp: Date.now(),
-        type: "input",
+        type,
         elementTag: tagName,
-        elementText: element.textContent?.trim().substring(0, 50) || "",
+        elementText,
         elementClass,
         elementId,
         description,
-        inputValue: value,
+        inputValue,
       };
 
-      console.log("🚀 ~ Creating new input record:", newRecord);
+      console.log("🚀 ~ addActionRecord ~ record:", record);
+      setActionHistory((prev) => [record, ...prev].slice(0, 50));
 
-      // 先设置 ref，再添加到历史记录
-      currentInputActionRef.current = newRecord;
-      setActionHistory((prev) => [newRecord, ...prev].slice(0, 50));
-    }
-  };
+      return record; // 返回创建的记录
+    },
+    [setActionHistory],
+  );
+
+  // 处理输入操作（使用 useRef 管理状态）
+  const handleInputAction = useCallback(
+    (element: HTMLElement, value: string) => {
+      const tagName = element.tagName.toLowerCase();
+      const elementId = element.id || "";
+      const elementClass = element.className || "";
+
+      console.log(
+        "🚀 ~ handleInputAction ~ currentInputActionRef.current:",
+        currentInputActionRef.current,
+      );
+      console.log(
+        "🚀 ~ handleInputAction ~ tagName:",
+        tagName,
+        "elementId:",
+        elementId,
+        "elementClass:",
+        elementClass,
+      );
+
+      // 检查是否是同一个输入框的连续输入
+      const isSameElement =
+        currentInputActionRef.current &&
+        currentInputActionRef.current.elementTag === tagName &&
+        currentInputActionRef.current.elementId === elementId &&
+        currentInputActionRef.current.elementClass === elementClass;
+
+      console.log("🚀 ~ handleInputAction ~ isSameElement:", isSameElement);
+
+      if (isSameElement && currentInputActionRef.current) {
+        console.log("🚀 ~ Updating existing input record");
+        // 更新现有记录的描述和输入值
+        let description = `Input <${tagName}>`;
+        if (elementId) {
+          description += ` (id: ${elementId})`;
+        }
+        if (value) {
+          description += ` - "${
+            value.length > 30 ? value.substring(0, 30) + "..." : value
+          }"`;
+        }
+
+        const updatedAction: ActionRecord = {
+          ...currentInputActionRef.current,
+          timestamp: Date.now(),
+          inputValue: value,
+          description,
+        };
+
+        // 更新 ref 和状态
+        currentInputActionRef.current = updatedAction;
+
+        // 更新历史记录中的对应项（保持在原位置）
+        setActionHistory((prev) =>
+          prev.map((action) =>
+            action.id === updatedAction.id ? updatedAction : action,
+          ),
+        );
+      } else {
+        console.log("🚀 ~ Creating new input record");
+        // 只有在不是连续输入的情况下才创建新记录
+        let description = `Input <${tagName}>`;
+        if (elementId) {
+          description += ` (id: ${elementId})`;
+        }
+        if (value) {
+          description += ` - "${
+            value.length > 30 ? value.substring(0, 30) + "..." : value
+          }"`;
+        }
+
+        const newRecord: ActionRecord = {
+          id: Math.random().toString(36).substring(2, 15),
+          timestamp: Date.now(),
+          type: "input",
+          elementTag: tagName,
+          elementText: element.textContent?.trim().substring(0, 50) || "",
+          elementClass,
+          elementId,
+          description,
+          inputValue: value,
+        };
+
+        console.log("🚀 ~ Creating new input record:", newRecord);
+
+        // 先设置 ref，再添加到历史记录
+        currentInputActionRef.current = newRecord;
+        setActionHistory((prev) => [newRecord, ...prev].slice(0, 50));
+      }
+    },
+    [setActionHistory],
+  );
 
   // 添加iframe事件监听器
-  const addIframeEventListeners = () => {
+  const addIframeEventListeners = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) {
       console.log("🚀 ~ iframe contentDocument not ready");
@@ -270,7 +276,7 @@ export const PageEditor = ({
       iframeDoc.removeEventListener("dblclick", handleIframeDoubleClick, true);
       iframeDoc.removeEventListener("input", handleIframeInput, true);
     };
-  };
+  }, [addActionRecord, handleInputAction, isElementSelectMode]);
 
   useEffect(() => {
     // Compile and render the page
@@ -337,10 +343,53 @@ export const PageEditor = ({
         cleanup();
       }
     };
-  }, [dom, isElementSelectMode]); // 依赖dom和选择模式状态
+  }, [addIframeEventListeners, dom, isElementSelectMode]); // 依赖dom和选择模式状态
+
+  // 选择元素
+  const selectElement = useCallback(
+    async (element: HTMLElement) => {
+      const tagName = element.tagName.toLowerCase();
+
+      try {
+        // 调用AI生成元素描述
+        const result = await generateDescriptionMutation.mutateAsync({
+          type: "element",
+          content: element.outerHTML,
+          context: `标签类型: ${tagName}, 文本内容: ${
+            element.textContent?.trim() || "无"
+          }`,
+        });
+
+        const elementName = result.description;
+
+        // 创建自定义事件，通知 RichTextInput 组件
+        const event = new CustomEvent("elementDrop", {
+          detail: {
+            type: "element",
+            name: elementName,
+            content: element.outerHTML,
+          },
+        });
+        window.dispatchEvent(event);
+      } catch (error) {
+        console.error("生成元素描述失败:", error);
+        // 使用默认名称作为后备
+        const elementName = `<${tagName}>`;
+        const event = new CustomEvent("elementDrop", {
+          detail: {
+            type: "element",
+            name: elementName,
+            content: element.outerHTML,
+          },
+        });
+        window.dispatchEvent(event);
+      }
+    },
+    [generateDescriptionMutation],
+  );
 
   // 启用元素选择模式
-  const enableElementSelection = () => {
+  const enableElementSelection = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) return;
 
@@ -441,7 +490,7 @@ export const PageEditor = ({
 
     // 保存清理函数到iframe上，方便后续调用
     (iframe as any).elementSelectorCleanup = cleanup;
-  };
+  }, [onElementSelectModeChange, selectElement]);
 
   // 禁用元素选择模式
   const disableElementSelection = () => {
@@ -449,46 +498,6 @@ export const PageEditor = ({
     if (iframe && (iframe as any).elementSelectorCleanup) {
       (iframe as any).elementSelectorCleanup();
       (iframe as any).elementSelectorCleanup = null;
-    }
-  };
-
-  // 选择元素
-  const selectElement = async (element: HTMLElement) => {
-    const tagName = element.tagName.toLowerCase();
-
-    try {
-      // 调用AI生成元素描述
-      const result = await generateDescriptionMutation.mutateAsync({
-        type: "element",
-        content: element.outerHTML,
-        context: `标签类型: ${tagName}, 文本内容: ${
-          element.textContent?.trim() || "无"
-        }`,
-      });
-
-      const elementName = result.description;
-
-      // 创建自定义事件，通知 RichTextInput 组件
-      const event = new CustomEvent("elementDrop", {
-        detail: {
-          type: "element",
-          name: elementName,
-          content: element.outerHTML,
-        },
-      });
-      window.dispatchEvent(event);
-    } catch (error) {
-      console.error("生成元素描述失败:", error);
-      // 使用默认名称作为后备
-      const elementName = `<${tagName}>`;
-      const event = new CustomEvent("elementDrop", {
-        detail: {
-          type: "element",
-          name: elementName,
-          content: element.outerHTML,
-        },
-      });
-      window.dispatchEvent(event);
     }
   };
 
@@ -507,7 +516,7 @@ export const PageEditor = ({
     } else {
       disableElementSelection();
     }
-  }, [isElementSelectMode]);
+  }, [enableElementSelection, isElementSelectMode]);
 
   return (
     <div className="absolute inset-0 flex justify-center">
