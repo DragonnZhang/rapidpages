@@ -44,46 +44,48 @@ export const ActionTimeline = () => {
         selectedActionIds.includes(a.id),
       );
 
-      try {
-        // 生成操作序列的描述
-        const actionDescriptions = sequenceActions
-          .sort((a, b) => a.timestamp - b.timestamp) // 按时间正序排列
-          .map((action) => `${action.description}`)
-          .join(" -> ");
+      const enableAI = process.env.NEXT_PUBLIC_ENABLE_AI_DESCRIPTION === "true";
+      let sequenceName: string;
 
-        const result = await generateDescriptionMutation.mutateAsync({
-          type: "action-sequence",
-          content: actionDescriptions,
-          context: `操作数量: ${sequenceActions.length}`,
-        });
+      if (enableAI) {
+        try {
+          // 生成操作序列的描述
+          const actionDescriptions = sequenceActions
+            .sort((a, b) => a.timestamp - b.timestamp) // 按时间正序排列
+            .map((action) => `${action.description}`)
+            .join(" -> ");
 
-        const sequenceName = `${result.description}（${
-          sequenceActions.length
-        } ${sequenceActions.length > 1 ? "items" : "item"}）`;
-
-        const event = new CustomEvent("actionSequenceDrop", {
-          detail: {
+          const result = await generateDescriptionMutation.mutateAsync({
             type: "action-sequence",
-            name: sequenceName,
-            actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp), // 按时间倒序用于显示
-          },
-        });
-        window.dispatchEvent(event);
-      } catch (error) {
-        console.error("生成操作序列描述失败:", error);
-        // 使用默认名称作为后备
-        const sequenceName = `操作序列（${sequenceActions.length}${
+            content: actionDescriptions,
+            context: `操作数量: ${sequenceActions.length}`,
+          });
+
+          sequenceName = `${result.description}（${sequenceActions.length} ${
+            sequenceActions.length > 1 ? "items" : "item"
+          }）`;
+        } catch (error) {
+          console.error("生成操作序列描述失败:", error);
+          // 使用默认名称作为后备
+          sequenceName = `操作序列（${sequenceActions.length}${
+            sequenceActions.length > 1 ? " items" : " item"
+          }）`;
+        }
+      } else {
+        // 不使用AI，直接生成描述
+        sequenceName = `操作序列（${sequenceActions.length}${
           sequenceActions.length > 1 ? " items" : " item"
         }）`;
-        const event = new CustomEvent("actionSequenceDrop", {
-          detail: {
-            type: "action-sequence",
-            name: sequenceName,
-            actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp),
-          },
-        });
-        window.dispatchEvent(event);
       }
+
+      const event = new CustomEvent("actionSequenceDrop", {
+        detail: {
+          type: "action-sequence",
+          name: sequenceName,
+          actions: sequenceActions.sort((a, b) => b.timestamp - a.timestamp), // 按时间倒序用于显示
+        },
+      });
+      window.dispatchEvent(event);
 
       setSelectedActionIds([]); // 清除选择
       return;

@@ -349,41 +349,53 @@ export const PageEditor = ({
   const selectElement = useCallback(
     async (element: HTMLElement) => {
       const tagName = element.tagName.toLowerCase();
+      const enableAI = process.env.NEXT_PUBLIC_ENABLE_AI_DESCRIPTION === "true";
 
-      try {
-        // 调用AI生成元素描述
-        const result = await generateDescriptionMutation.mutateAsync({
-          type: "element",
-          content: element.outerHTML,
-          context: `标签类型: ${tagName}, 文本内容: ${
-            element.textContent?.trim() || "无"
-          }`,
-        });
+      let elementName: string;
 
-        const elementName = result.description;
-
-        // 创建自定义事件，通知 RichTextInput 组件
-        const event = new CustomEvent("elementDrop", {
-          detail: {
+      if (enableAI) {
+        try {
+          // 调用AI生成元素描述
+          const result = await generateDescriptionMutation.mutateAsync({
             type: "element",
-            name: elementName,
             content: element.outerHTML,
-          },
-        });
-        window.dispatchEvent(event);
-      } catch (error) {
-        console.error("生成元素描述失败:", error);
-        // 使用默认名称作为后备
-        const elementName = `<${tagName}>`;
-        const event = new CustomEvent("elementDrop", {
-          detail: {
-            type: "element",
-            name: elementName,
-            content: element.outerHTML,
-          },
-        });
-        window.dispatchEvent(event);
+            context: `标签类型: ${tagName}, 文本内容: ${
+              element.textContent?.trim() || "无"
+            }`,
+          });
+
+          elementName = result.description;
+        } catch (error) {
+          console.error("生成元素描述失败:", error);
+          // 使用默认名称作为后备
+          elementName = `<${tagName}>`;
+        }
+      } else {
+        // 不使用AI，直接生成描述
+        const elementText = element.textContent?.trim().substring(0, 30) || "";
+        const elementId = element.id || "";
+        const elementClass = element.className || "";
+
+        elementName = `<${tagName}>`;
+        if (elementId) {
+          elementName += ` (id: ${elementId})`;
+        } else if (elementClass) {
+          elementName += ` (class: ${elementClass.split(" ")[0]})`;
+        }
+        if (elementText) {
+          elementName += ` - "${elementText}"`;
+        }
       }
+
+      // 创建自定义事件，通知 RichTextInput 组件
+      const event = new CustomEvent("elementDrop", {
+        detail: {
+          type: "element",
+          name: elementName,
+          content: element.outerHTML,
+        },
+      });
+      window.dispatchEvent(event);
     },
     [generateDescriptionMutation],
   );
