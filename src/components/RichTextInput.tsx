@@ -817,7 +817,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
                 添加内容
               </label>
 
-              <div className="relative min-h-[80px]">
+              <div className="relative max-h-[300px] min-h-[80px] overflow-y-auto">
                 {/* 使用 contentEditable div 替代 textarea */}
                 <div
                   ref={editorRef}
