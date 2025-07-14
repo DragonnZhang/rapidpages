@@ -158,7 +158,7 @@ const NewPage: NextPageWithLayout = () => {
             <RichTextInput
               onSubmit={handleGenerateComponent}
               disabled={isGenerating}
-              placeholder="描述您想要的组件，可以上传图片或语音作为参考..."
+              placeholder="描述您想要的组件，可以上传图片作为参考..."
               rows={3}
             />
           </div>

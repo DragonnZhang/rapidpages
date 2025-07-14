@@ -31,7 +31,7 @@ interface MediaBadge {
 export const RichTextInput: React.FC<RichTextInputProps> = ({
   onSubmit,
   disabled = false,
-  placeholder = "输入内容，可以插入图片、语音或代码文件...",
+  placeholder = "输入内容，可以插入图片或代码文件...",
 }) => {
   const [currentText, setCurrentText] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);

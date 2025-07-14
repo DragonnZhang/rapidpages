@@ -44,7 +44,7 @@ export const Chat = ({ revisionId }: { revisionId: string }) => {
       <RichTextInput
         onSubmit={handleSubmit}
         disabled={loading}
-        placeholder="描述您想要的修改，可以插入图片、语音或代码文件作为参考..."
+        placeholder="描述您想要的修改，可以插入图片或代码文件作为参考..."
         rows={2}
       />
     </div>
