@@ -41,14 +41,3 @@ export function parseCodeToComponentFiles(code: unknown): ComponentFile[] {
   console.warn("Unknown code format:", code);
   return [];
 }
-
-/**
- * 从ComponentFile数组中提取主组件内容
- * 用于向后兼容只需要单一组件内容的情况
- */
-export function extractMainComponentCode(files: ComponentFile[]): string {
-  // 找到标记为主组件的文件
-  const mainFile = files.find((file) => file.isMain);
-  // 如果没有找到主组件，使用第一个文件
-  return mainFile ? mainFile.content : files[0]?.content || "";
-}

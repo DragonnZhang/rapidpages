@@ -1,11 +1,7 @@
 import { useSession } from "next-auth/react";
-import { useState, type ReactElement, useRef, Fragment } from "react";
+import { useState, type ReactElement, Fragment } from "react";
 import { ApplicationLayout } from "~/components/AppLayout";
-import {
-  ChevronRightIcon,
-  CommandLineIcon,
-  PaperAirplaneIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronRightIcon, CommandLineIcon } from "@heroicons/react/24/outline";
 import { Dialog, Transition } from "@headlessui/react";
 import { Spinner } from "~/components/Spinner";
 import Image from "next/image";
