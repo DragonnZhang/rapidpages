@@ -395,7 +395,7 @@ export const PageEditor = ({
 
   // 启用元素选择模式
   const enableElementSelection = useCallback(() => {
-  const iframe = iframeRef.current as SelectableIframe | null;
+    const iframe = iframeRef.current as SelectableIframe | null;
     if (!iframe?.contentDocument) return;
 
     const iframeDoc = iframe.contentDocument;

@@ -132,10 +132,7 @@ export const ActionTimeline = () => {
   const hasLogic = logicEntities.length > 0;
 
   const sortedLogicEntities = useMemo(
-    () =>
-      logicEntities
-        .slice()
-        .sort((a, b) => b.updatedAt - a.updatedAt),
+    () => logicEntities.slice().sort((a, b) => b.updatedAt - a.updatedAt),
     [logicEntities],
   );
 

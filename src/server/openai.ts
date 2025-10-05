@@ -71,7 +71,9 @@ const buildMediaContext = (
   }
 
   const lines = media.map((mediaItem, index) => {
-    const baseLine = `${index + 1}. ${describeMediaType(mediaItem)} "${mediaItem.name}": ${mediaItem.url}`;
+    const baseLine = `${index + 1}. ${describeMediaType(mediaItem)} "${
+      mediaItem.name
+    }": ${mediaItem.url}`;
 
     if (mediaItem.type === "logic") {
       const elementLine = mediaItem.elementName
@@ -350,13 +352,18 @@ export async function generateNewComponent(
         media && media.length > 0
           ? `\n注意：我已经提供了相关的媒体文件作为参考，请根据这些文件来理解需求并创建组件。`
           : "",
-      ].filter(Boolean).join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
   ];
 
   appendMediaToUserParts(media, userContentParts);
 
-  console.log("🚀 ~ generateNewComponent ~ userContentParts:", userContentParts);
+  console.log(
+    "🚀 ~ generateNewComponent ~ userContentParts:",
+    userContentParts,
+  );
 
   const initialResponse = await generateText({
     model,

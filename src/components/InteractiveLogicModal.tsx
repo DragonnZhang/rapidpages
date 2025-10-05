@@ -162,7 +162,9 @@ export const InteractiveLogicModal = () => {
               <Dialog.Panel className="w-full max-w-xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <div className="flex items-start justify-between">
                   <Dialog.Title className="text-lg font-semibold text-gray-900">
-                    {modalState.mode === "create" ? "保存交互逻辑" : "编辑交互逻辑"}
+                    {modalState.mode === "create"
+                      ? "保存交互逻辑"
+                      : "编辑交互逻辑"}
                   </Dialog.Title>
                   <button
                     type="button"
@@ -176,7 +178,9 @@ export const InteractiveLogicModal = () => {
                 {modalState.elementDetail && modalState.mode === "create" && (
                   <div className="mt-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-600">
                     <div className="font-medium text-gray-800">已选元素</div>
-                    <div className="mt-1 text-gray-700">{modalState.elementDetail.elementName}</div>
+                    <div className="mt-1 text-gray-700">
+                      {modalState.elementDetail.elementName}
+                    </div>
                   </div>
                 )}
 
