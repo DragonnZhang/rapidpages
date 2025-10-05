@@ -9,8 +9,21 @@ import {
 import { generateNewComponent, reviseComponent } from "~/server/openai";
 import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 
+const ActionRecordSchema = z.object({
+  id: z.string(),
+  timestamp: z.number(),
+  type: z.enum(["click", "rightclick", "doubleclick", "input"]),
+  elementTag: z.string(),
+  elementText: z.string(),
+  elementClass: z.string(),
+  elementId: z.string(),
+  description: z.string(),
+  inputValue: z.string().optional(),
+});
+
 // 定义媒体对象的Zod schema
 const MediaItemSchema = z.object({
+  id: z.string(),
   url: z.string(),
   name: z.string(),
   type: z.enum([
@@ -20,7 +33,13 @@ const MediaItemSchema = z.object({
     "element",
     "action",
     "action-sequence",
-  ]), // 添加 action 类型
+    "logic",
+  ]),
+  size: z.number().optional(),
+  actions: z.array(ActionRecordSchema).optional(),
+  logicId: z.string().optional(),
+  logicContent: z.string().optional(),
+  elementName: z.string().optional(),
 });
 
 export const componentRouter = createTRPCRouter({
@@ -33,8 +52,6 @@ export const componentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-
-      console.log("🚀 ~ createComponent input:", input);
 
       // 传递媒体对象给生成函数
       const result = await generateNewComponent(input.prompt, input.media);
@@ -77,8 +94,6 @@ export const componentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-
-      console.log("🚀 ~ makeRevision input:", input);
 
       const baseRevision = await ctx.db.componentRevision.findFirst({
         where: {
@@ -360,8 +375,8 @@ export const componentImportRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-      const { code, description } = input;
+  const userId = ctx.session.user.id;
+  const { code, description } = input;
 
       // @todo validate code
       if (!code /* || !isValid(code) */) {
@@ -375,7 +390,7 @@ export const componentImportRouter = createTRPCRouter({
       const codeFiles = [
         {
           filename: "Section.tsx",
-          content: input.code,
+          content: code,
           isMain: true,
         },
       ];
@@ -383,12 +398,12 @@ export const componentImportRouter = createTRPCRouter({
       const component = await ctx.db.component.create({
         data: {
           code: codeFiles, // 存储为ComponentFile[]格式
-          authorId: null,
-          prompt: input.description,
+          authorId: userId,
+          prompt: description,
           revisions: {
             create: {
               code: codeFiles, // 同样存储为ComponentFile[]格式
-              prompt: input.description,
+              prompt: description,
             },
           },
         },

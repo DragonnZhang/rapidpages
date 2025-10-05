@@ -4,17 +4,27 @@ import { type ActionRecord } from "~/types/multimodal";
 import { api } from "~/utils/api";
 import { useAtom } from "jotai";
 import { actionHistoryAtom } from "~/store/actionHistoryStore";
+import { type ElementSelectionDetail } from "~/store/interactiveLogicStore";
+
+type SelectableIframe = HTMLIFrameElement & {
+  elementSelectorCleanup?: () => void;
+};
 
 interface MyProps extends React.HTMLAttributes<HTMLDivElement> {
   code: ComponentFile[];
-  isElementSelectMode: boolean;
-  onElementSelectModeChange: (mode: boolean) => void;
+  selectionMode: "none" | "element" | "logic";
+  onSelectionModeChange: (mode: "none" | "element" | "logic") => void;
+  onElementSelection?: (
+    detail: ElementSelectionDetail,
+    mode: "element" | "logic",
+  ) => void;
 }
 
 export const PageEditor = ({
   code,
-  isElementSelectMode,
-  onElementSelectModeChange,
+  selectionMode,
+  onSelectionModeChange,
+  onElementSelection,
 }: MyProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [dom, setDom] = useState<string | undefined>(undefined);
@@ -76,7 +86,6 @@ export const PageEditor = ({
         inputValue,
       };
 
-      console.log("🚀 ~ addActionRecord ~ record:", record);
       setActionHistory((prev) => [record, ...prev].slice(0, 50));
 
       return record; // 返回创建的记录
@@ -91,19 +100,6 @@ export const PageEditor = ({
       const elementId = element.id || "";
       const elementClass = element.className || "";
 
-      console.log(
-        "🚀 ~ handleInputAction ~ currentInputActionRef.current:",
-        currentInputActionRef.current,
-      );
-      console.log(
-        "🚀 ~ handleInputAction ~ tagName:",
-        tagName,
-        "elementId:",
-        elementId,
-        "elementClass:",
-        elementClass,
-      );
-
       // 检查是否是同一个输入框的连续输入
       const isSameElement =
         currentInputActionRef.current &&
@@ -111,10 +107,7 @@ export const PageEditor = ({
         currentInputActionRef.current.elementId === elementId &&
         currentInputActionRef.current.elementClass === elementClass;
 
-      console.log("🚀 ~ handleInputAction ~ isSameElement:", isSameElement);
-
       if (isSameElement && currentInputActionRef.current) {
-        console.log("🚀 ~ Updating existing input record");
         // 更新现有记录的描述和输入值
         let description = `Input <${tagName}>`;
         if (elementId) {
@@ -143,7 +136,6 @@ export const PageEditor = ({
           ),
         );
       } else {
-        console.log("🚀 ~ Creating new input record");
         // 只有在不是连续输入的情况下才创建新记录
         let description = `Input <${tagName}>`;
         if (elementId) {
@@ -166,9 +158,6 @@ export const PageEditor = ({
           description,
           inputValue: value,
         };
-
-        console.log("🚀 ~ Creating new input record:", newRecord);
-
         // 先设置 ref，再添加到历史记录
         currentInputActionRef.current = newRecord;
         setActionHistory((prev) => [newRecord, ...prev].slice(0, 50));
@@ -181,17 +170,14 @@ export const PageEditor = ({
   const addIframeEventListeners = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) {
-      console.log("🚀 ~ iframe contentDocument not ready");
       return null;
     }
 
     const iframeDoc = iframe.contentDocument;
-    console.log("🚀 ~ Adding iframe event listeners");
 
     // 点击事件
     const handleIframeClick = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe click detected", e.target);
-      if (isElementSelectMode) return;
+      if (selectionMode !== "none") return;
 
       const target = e.target as HTMLElement;
       if (
@@ -207,8 +193,7 @@ export const PageEditor = ({
 
     // 右键点击事件
     const handleIframeContextMenu = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe contextmenu detected", e.target);
-      if (isElementSelectMode) return;
+      if (selectionMode !== "none") return;
 
       const target = e.target as HTMLElement;
       if (
@@ -224,8 +209,7 @@ export const PageEditor = ({
 
     // 双击事件
     const handleIframeDoubleClick = (e: MouseEvent) => {
-      console.log("🚀 ~ iframe dblclick detected", e.target);
-      if (isElementSelectMode) return;
+      if (selectionMode !== "none") return;
 
       const target = e.target as HTMLElement;
       if (
@@ -241,8 +225,7 @@ export const PageEditor = ({
 
     // 统一的输入事件监听器
     const handleIframeInput = (e: Event) => {
-      console.log("🚀 ~ iframe input detected", e.target);
-      if (isElementSelectMode) return;
+      if (selectionMode !== "none") return;
 
       const target = e.target as HTMLElement;
 
@@ -266,7 +249,6 @@ export const PageEditor = ({
     iframeDoc.addEventListener("input", handleIframeInput, true);
 
     return () => {
-      console.log("🚀 ~ Removing iframe event listeners");
       iframeDoc.removeEventListener("click", handleIframeClick, true);
       iframeDoc.removeEventListener(
         "contextmenu",
@@ -276,7 +258,7 @@ export const PageEditor = ({
       iframeDoc.removeEventListener("dblclick", handleIframeDoubleClick, true);
       iframeDoc.removeEventListener("input", handleIframeInput, true);
     };
-  }, [addActionRecord, handleInputAction, isElementSelectMode]);
+  }, [addActionRecord, handleInputAction, selectionMode]);
 
   useEffect(() => {
     // Compile and render the page
@@ -324,11 +306,7 @@ export const PageEditor = ({
           // 只在还没有成功添加监听器时尝试
           cleanup = addIframeEventListeners();
           if (cleanup) {
-            console.log(
-              "🚀 ~ Successfully added iframe event listeners after",
-              delay,
-              "ms",
-            );
+            return;
           }
         }
       }, delay);
@@ -343,7 +321,7 @@ export const PageEditor = ({
         cleanup();
       }
     };
-  }, [addIframeEventListeners, dom, isElementSelectMode]); // 依赖dom和选择模式状态
+  }, [addIframeEventListeners, dom]);
 
   // 选择元素
   const selectElement = useCallback(
@@ -366,7 +344,6 @@ export const PageEditor = ({
 
           elementName = result.description;
         } catch (error) {
-          console.error("生成元素描述失败:", error);
           // 使用默认名称作为后备
           elementName = `<${tagName}>`;
         }
@@ -387,22 +364,38 @@ export const PageEditor = ({
         }
       }
 
-      // 创建自定义事件，通知 RichTextInput 组件
-      const event = new CustomEvent("elementDrop", {
-        detail: {
-          type: "element",
-          name: elementName,
-          content: element.outerHTML,
-        },
-      });
-      window.dispatchEvent(event);
+      const detail: ElementSelectionDetail = {
+        elementName,
+        elementContent: element.outerHTML,
+      };
+
+      if (selectionMode === "logic") {
+        onElementSelection?.(detail, "logic");
+      } else {
+        const event = new CustomEvent("elementDrop", {
+          detail: {
+            type: "element",
+            name: detail.elementName,
+            content: detail.elementContent,
+          },
+        });
+        window.dispatchEvent(event);
+        onElementSelection?.(detail, "element");
+      }
+
+      onSelectionModeChange("none");
     },
-    [generateDescriptionMutation],
+    [
+      generateDescriptionMutation,
+      onElementSelection,
+      onSelectionModeChange,
+      selectionMode,
+    ],
   );
 
   // 启用元素选择模式
   const enableElementSelection = useCallback(() => {
-    const iframe = iframeRef.current;
+  const iframe = iframeRef.current as SelectableIframe | null;
     if (!iframe?.contentDocument) return;
 
     const iframeDoc = iframe.contentDocument;
@@ -480,11 +473,8 @@ export const PageEditor = ({
       e.stopPropagation();
 
       if (currentHoveredElement) {
-        selectElement(currentHoveredElement);
+        void selectElement(currentHoveredElement);
       }
-
-      // 选择完元素后自动退出选择模式
-      onElementSelectModeChange(false);
     };
 
     overlay.addEventListener("mousemove", handleMouseMove);
@@ -501,15 +491,15 @@ export const PageEditor = ({
     };
 
     // 保存清理函数到iframe上，方便后续调用
-    (iframe as any).elementSelectorCleanup = cleanup;
-  }, [onElementSelectModeChange, selectElement]);
+    iframe.elementSelectorCleanup = cleanup;
+  }, [selectElement]);
 
   // 禁用元素选择模式
   const disableElementSelection = () => {
-    const iframe = iframeRef.current;
-    if (iframe && (iframe as any).elementSelectorCleanup) {
-      (iframe as any).elementSelectorCleanup();
-      (iframe as any).elementSelectorCleanup = null;
+    const iframe = iframeRef.current as SelectableIframe | null;
+    if (iframe?.elementSelectorCleanup) {
+      iframe.elementSelectorCleanup();
+      iframe.elementSelectorCleanup = undefined;
     }
   };
 
@@ -523,12 +513,12 @@ export const PageEditor = ({
 
   // 当外部状态变化时，同步内部逻辑
   useEffect(() => {
-    if (isElementSelectMode) {
+    if (selectionMode !== "none") {
       enableElementSelection();
     } else {
       disableElementSelection();
     }
-  }, [enableElementSelection, isElementSelectMode]);
+  }, [enableElementSelection, selectionMode]);
 
   return (
     <div className="absolute inset-0 flex justify-center">

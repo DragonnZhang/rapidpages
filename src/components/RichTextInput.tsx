@@ -12,6 +12,8 @@ import {
   isAudioFile,
 } from "~/utils/fileUtils";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import { useSetAtom } from "jotai";
+import { interactiveLogicModalAtom } from "~/store/interactiveLogicStore";
 
 interface RichTextInputProps {
   onSubmit: (content: RichTextContent) => void;
@@ -23,9 +25,19 @@ interface RichTextInputProps {
 interface MediaBadge {
   id: string;
   filename: string;
-  type: "image" | "audio" | "code" | "element" | "action" | "action-sequence";
+  type:
+    | "image"
+    | "audio"
+    | "code"
+    | "element"
+    | "action"
+    | "action-sequence"
+    | "logic";
   actionSequence?: ActionRecord[];
   displayName?: string;
+  logicId?: string;
+  logicContent?: string;
+  elementName?: string;
 }
 
 export const RichTextInput: React.FC<RichTextInputProps> = ({
@@ -40,6 +52,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const setLogicModalState = useSetAtom(interactiveLogicModalAtom);
 
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
@@ -93,6 +106,18 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   );
 
   // 创建 badge 元素
+  const openLogicEditor = useCallback(
+    (logicId?: string) => {
+      if (!logicId) return;
+      setLogicModalState({
+        isOpen: true,
+        mode: "edit",
+        entityId: logicId,
+      });
+    },
+    [setLogicModalState],
+  );
+
   const createBadgeElement = useCallback(
     (badge: MediaBadge): HTMLElement => {
       if (badge.type === "action-sequence" && badge.actionSequence) {
@@ -262,6 +287,10 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return `<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
             </svg>`;
+            case "logic":
+              return `<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18" />
+            </svg>`;
             default:
               return `<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -279,6 +308,8 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
               return "border-purple-200 bg-purple-100 text-purple-800";
             case "element":
               return "border-orange-200 bg-orange-100 text-orange-800";
+            case "logic":
+              return "border-emerald-200 bg-emerald-100 text-emerald-800";
             default:
               return "border-blue-200 bg-blue-100 text-blue-800";
           }
@@ -296,6 +327,10 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
         const textSpan = document.createElement("span");
         textSpan.className = "max-w-24 truncate";
         textSpan.textContent = badge.displayName || badge.filename;
+        if (badge.type === "logic") {
+          textSpan.classList.add("logic-badge-label");
+          badgeElement.setAttribute("data-logic-id", badge.logicId ?? "");
+        }
         badgeElement.appendChild(textSpan);
 
         // 创建删除按钮
@@ -341,12 +376,18 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
             e.stopPropagation();
             openImagePreview(badge.id);
           });
+        } else if (badge.type === "logic" && badge.logicId) {
+          badgeElement.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openLogicEditor(badge.logicId);
+          });
         }
 
         return badgeElement;
       }
     },
-    [openImagePreview, removeMedia],
+    [openImagePreview, openLogicEditor, removeMedia],
   );
 
   // 插入 badge
@@ -360,6 +401,9 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
       const placeholderSpan = document.createElement("span");
       placeholderSpan.setAttribute("data-badge-id", badge.id);
       placeholderSpan.contentEditable = "false";
+      if (badge.type === "logic" && badge.logicId) {
+        placeholderSpan.setAttribute("data-logic-id", badge.logicId);
+      }
       placeholderSpan.appendChild(badgeElement);
 
       // 确保焦点在编辑器上，然后插入到末尾
@@ -684,6 +728,106 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
       );
     };
   }, [handleActionSequenceDrop]);
+
+  const handleLogicEntityDrop = useCallback(
+    (detail: {
+      id: string;
+      name: string;
+      logic: string;
+      elementName: string;
+    }) => {
+      const mediaItem: MediaItem = {
+        id: generateId(),
+        type: "logic",
+        url: detail.logic,
+        name: detail.name,
+        logicId: detail.id,
+        logicContent: detail.logic,
+        elementName: detail.elementName,
+      };
+
+      setMedia((prev) => [...prev, mediaItem]);
+
+      const newBadge: MediaBadge = {
+        id: mediaItem.id,
+        filename: detail.name,
+        type: "logic",
+        displayName: detail.name,
+        logicId: detail.id,
+        logicContent: detail.logic,
+        elementName: detail.elementName,
+      };
+
+      insertBadge(mediaItem, newBadge);
+
+      return mediaItem;
+    },
+    [insertBadge],
+  );
+
+  useEffect(() => {
+    const handleLogicDropEvent = (event: CustomEvent) => {
+      handleLogicEntityDrop(event.detail);
+    };
+
+    window.addEventListener(
+      "logicEntityDrop",
+      handleLogicDropEvent as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "logicEntityDrop",
+        handleLogicDropEvent as EventListener,
+      );
+    };
+  }, [handleLogicEntityDrop]);
+
+  useEffect(() => {
+    const handleLogicUpdate = (event: CustomEvent) => {
+      const detail = event.detail as {
+        id: string;
+        name: string;
+        logic: string;
+        elementName: string;
+      };
+
+      setMedia((prev) =>
+        prev.map((item) =>
+          item.type === "logic" && item.logicId === detail.id
+            ? {
+                ...item,
+                name: detail.name,
+                url: detail.logic,
+                logicContent: detail.logic,
+                elementName: detail.elementName,
+              }
+            : item,
+        ),
+      );
+
+      if (editorRef.current) {
+        const placeholders = editorRef.current.querySelectorAll(
+          `[data-logic-id="${detail.id}"] .logic-badge-label`,
+        );
+        placeholders.forEach((node) => {
+          node.textContent = detail.name;
+        });
+      }
+    };
+
+    window.addEventListener(
+      "logicEntityUpdated",
+      handleLogicUpdate as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "logicEntityUpdated",
+        handleLogicUpdate as EventListener,
+      );
+    };
+  }, []);
 
   // 提交内容
   const handleSubmit = (e: React.FormEvent) => {

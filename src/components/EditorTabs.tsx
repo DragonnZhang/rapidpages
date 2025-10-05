@@ -1,5 +1,5 @@
 import { Tab } from "@headlessui/react";
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Logo } from "~/components/Logo";
 import { TabBackground } from "~/components/TabBackground";
 import { useComponentProvider } from "~/context/ComponentProvider";
@@ -11,6 +11,7 @@ import {
   ArrowUpTrayIcon,
   DocumentDuplicateIcon,
   CursorArrowRaysIcon,
+  CommandLineIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -19,6 +20,12 @@ import router from "next/router";
 import { api } from "~/utils/api";
 import { type ComponentFile } from "~/utils/compiler";
 import { ActionTimeline } from "./ActionTimeline";
+import { InteractiveLogicModal } from "./InteractiveLogicModal";
+import { useSetAtom } from "jotai";
+import {
+  interactiveLogicModalAtom,
+  type ElementSelectionDetail,
+} from "~/store/interactiveLogicStore";
 
 export const EditorTabs = ({
   code,
@@ -28,8 +35,11 @@ export const EditorTabs = ({
   revisionId: string;
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [isElementSelectMode, setIsElementSelectMode] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<
+    "none" | "element" | "logic"
+  >("none");
   const { tabs } = useComponentProvider();
+  const setLogicModalState = useSetAtom(interactiveLogicModalAtom);
 
   // If a tab is active find the active tab index
   const activeTab = tabs.find((tab) => tab.active);
@@ -38,12 +48,38 @@ export const EditorTabs = ({
 
   const forkRevision = api.component.forkRevision.useMutation();
 
-  const handleElementSelectToggle = () => {
-    setIsElementSelectMode(!isElementSelectMode);
-  };
+  const toggleSelectionMode = useCallback((mode: "element" | "logic") => {
+    setSelectionMode((prev) => (prev === mode ? "none" : mode));
+  }, []);
+
+  const handleElementSelection = useCallback(
+    (detail: ElementSelectionDetail, mode: "element" | "logic") => {
+      if (mode === "logic") {
+        setLogicModalState({
+          isOpen: true,
+          mode: "create",
+          elementDetail: detail,
+        });
+      }
+    },
+    [setLogicModalState],
+  );
+
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectionMode("none");
+      }
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
 
   return (
-    <Tab.Group selectedIndex={selectedIndex}>
+    <>
+      <InteractiveLogicModal />
+      <Tab.Group selectedIndex={selectedIndex}>
       <div className="flex flex-col">
         {/* 操作时间轴 */}
         <ActionTimeline />
@@ -106,21 +142,44 @@ export const EditorTabs = ({
               <>
                 {/* 元素选择按钮 */}
                 <button
-                  onClick={handleElementSelectToggle}
+                  onClick={() => toggleSelectionMode("element")}
                   className={`
                   inline-flex items-center rounded-md px-2.5 py-1.5 text-sm font-medium shadow-sm
                   ${
-                    isElementSelectMode
+                    selectionMode === "element"
                       ? "bg-red-600 text-white hover:bg-red-700"
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }
                 `}
                   title={
-                    isElementSelectMode ? "取消选择元素 (ESC)" : "选择页面元素"
+                    selectionMode === "element"
+                      ? "取消选择元素 (ESC)"
+                      : "选择页面元素"
                   }
                 >
                   <CursorArrowRaysIcon className="mr-2 h-4 w-4" />
-                  {isElementSelectMode ? "Cancel" : "Select"}
+                  {selectionMode === "element" ? "Cancel" : "Select"}
+                </button>
+
+                {/* 交互逻辑选择按钮 */}
+                <button
+                  onClick={() => toggleSelectionMode("logic")}
+                  className={`
+                  inline-flex items-center rounded-md px-2.5 py-1.5 text-sm font-medium shadow-sm
+                  ${
+                    selectionMode === "logic"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-emerald-500 text-white hover:bg-emerald-600"
+                  }
+                `}
+                  title={
+                    selectionMode === "logic"
+                      ? "取消交互逻辑捕捉 (ESC)"
+                      : "选择页面元素并编写交互逻辑"
+                  }
+                >
+                  <CommandLineIcon className="mr-2 h-4 w-4" />
+                  {selectionMode === "logic" ? "取消逻辑" : "记录逻辑"}
                 </button>
               </>
             )}
@@ -189,12 +248,13 @@ export const EditorTabs = ({
       </div>
 
       <div className="h-1 w-full rounded-t-lg border border-b-0 border-gray-300 bg-gray-200" />
-      <Tab.Panels className="h-full pb-3">
+  <Tab.Panels className="h-full pb-3">
         <Tab.Panel key={0} className="flex h-full flex-col">
           <PagePanel
             code={code}
-            isElementSelectMode={isElementSelectMode}
-            onElementSelectModeChange={setIsElementSelectMode}
+            selectionMode={selectionMode}
+            onSelectionModeChange={setSelectionMode}
+            onElementSelection={handleElementSelection}
           />
         </Tab.Panel>
         <Tab.Panel key={1} className="flex h-full max-h-full flex-col">
@@ -202,5 +262,6 @@ export const EditorTabs = ({
         </Tab.Panel>
       </Tab.Panels>
     </Tab.Group>
+    </>
   );
 };

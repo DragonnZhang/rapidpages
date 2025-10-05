@@ -3,21 +3,27 @@ import { PageEditor } from "./PageEditor";
 
 interface PagePanelProps {
   code: ComponentFile[];
-  isElementSelectMode: boolean;
-  onElementSelectModeChange: (mode: boolean) => void;
+  selectionMode: "none" | "element" | "logic";
+  onSelectionModeChange: (mode: "none" | "element" | "logic") => void;
+  onElementSelection?: (
+    detail: { elementName: string; elementContent: string },
+    mode: "element" | "logic",
+  ) => void;
 }
 
 export const PagePanel = ({
   code,
-  isElementSelectMode,
-  onElementSelectModeChange,
+  selectionMode,
+  onSelectionModeChange,
+  onElementSelection,
 }: PagePanelProps) => {
   return (
     <div className="relative h-full">
       <PageEditor
         code={code}
-        isElementSelectMode={isElementSelectMode}
-        onElementSelectModeChange={onElementSelectModeChange}
+        selectionMode={selectionMode}
+        onSelectionModeChange={onSelectionModeChange}
+        onElementSelection={onElementSelection}
       />
     </div>
   );
