@@ -153,8 +153,8 @@ export const EditorTabs = ({
                 `}
                     title={
                       selectionMode === "element"
-                        ? "取消选择元素 (ESC)"
-                        : "选择页面元素"
+                        ? "Cancel element selection (ESC)"
+                        : "Select page elements"
                     }
                   >
                     <CursorArrowRaysIcon className="mr-2 h-4 w-4" />
@@ -174,12 +174,14 @@ export const EditorTabs = ({
                 `}
                     title={
                       selectionMode === "logic"
-                        ? "取消交互逻辑捕捉 (ESC)"
-                        : "选择页面元素并编写交互逻辑"
+                        ? "Cancel logic capture (ESC)"
+                        : "Select an element and record interaction logic"
                     }
                   >
                     <CommandLineIcon className="mr-2 h-4 w-4" />
-                    {selectionMode === "logic" ? "取消逻辑" : "记录逻辑"}
+                    {selectionMode === "logic"
+                      ? "Cancel Logic"
+                      : "Record Logic"}
                   </button>
                 </>
               )}

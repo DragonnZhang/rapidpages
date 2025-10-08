@@ -26,7 +26,7 @@ export const Chat = ({ revisionId }: { revisionId: string }) => {
       console.log("🚀 ~ handleSubmit result:", newRevisionId);
 
       if (newRevisionId === null || newRevisionId.status === "error") {
-        toast.error("修改组件时出现错误");
+        toast.error("Something went wrong while updating the component.");
         setLoading(false);
         return;
       }
@@ -34,7 +34,7 @@ export const Chat = ({ revisionId }: { revisionId: string }) => {
       router.push(`/r/${newRevisionId.data.revisionId}`);
     } catch (error) {
       console.error("🚀 ~ handleSubmit error:", error);
-      toast.error("修改组件时出现错误");
+      toast.error("Something went wrong while updating the component.");
       setLoading(false);
     }
   };
@@ -44,7 +44,7 @@ export const Chat = ({ revisionId }: { revisionId: string }) => {
       <RichTextInput
         onSubmit={handleSubmit}
         disabled={loading}
-        placeholder="描述您想要的修改，可以插入图片或代码文件作为参考..."
+        placeholder="Describe the changes you need—feel free to attach images or code snippets as references."
         rows={2}
       />
     </div>

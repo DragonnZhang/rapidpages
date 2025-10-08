@@ -43,7 +43,7 @@ interface MediaBadge {
 export const RichTextInput: React.FC<RichTextInputProps> = ({
   onSubmit,
   disabled = false,
-  placeholder = "输入内容，可以插入图片或代码文件...",
+  placeholder = "Type your instructions—you can attach images, code, or captured actions.",
 }) => {
   const [currentText, setCurrentText] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -958,7 +958,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
           <form className="relative" onSubmit={handleSubmit}>
             <div className="overflow-hidden rounded-lg bg-white focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-600">
               <label htmlFor="richTextInput" className="sr-only">
-                添加内容
+                Add content
               </label>
 
               <div className="relative max-h-[300px] min-h-[80px] overflow-y-auto">

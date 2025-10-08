@@ -41,7 +41,7 @@ export const CodePanel = ({ code }: { code: ComponentFile[] }) => {
                 }
                 flex cursor-pointer items-center gap-2
               `}
-              title={`点击查看 ${file.filename}，拖拽到输入框作为参考`}
+              title={`View ${file.filename}. Drag it into the input as a reference.`}
             >
               <CodeBracketIcon className="h-4 w-4" />
               {file.filename}

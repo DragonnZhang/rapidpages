@@ -39,7 +39,7 @@ export const ActionTimeline = () => {
     action: ActionRecord,
     e: React.MouseEvent,
   ) => {
-    // 如果按住 Ctrl/Cmd 键，支持多选
+    // Support multi-select with Ctrl/Cmd
     if (e.ctrlKey || e.metaKey) {
       setSelectedActionIds((prev) =>
         prev.includes(action.id)
@@ -49,7 +49,7 @@ export const ActionTimeline = () => {
       return;
     }
 
-    // 如果有选中的多个操作，创建操作序列
+    // Create a sequence when multiple actions are selected
     if (selectedActionIds.length > 0) {
       const sequenceActions = actions.filter((a) =>
         selectedActionIds.includes(a.id),
@@ -60,33 +60,33 @@ export const ActionTimeline = () => {
 
       if (enableAI) {
         try {
-          // 生成操作序列的描述
+          // Generate a description for the sequence
           const actionDescriptions = sequenceActions
-            .sort((a, b) => a.timestamp - b.timestamp) // 按时间正序排列
+            .sort((a, b) => a.timestamp - b.timestamp) // Sort ascending by timestamp
             .map((action) => `${action.description}`)
             .join(" -> ");
 
           const result = await generateDescriptionMutation.mutateAsync({
             type: "action-sequence",
             content: actionDescriptions,
-            context: `操作数量: ${sequenceActions.length}`,
+            context: `Total actions: ${sequenceActions.length}`,
           });
 
-          sequenceName = `${result.description}（${sequenceActions.length} ${
+          sequenceName = `${result.description} (${sequenceActions.length} ${
             sequenceActions.length > 1 ? "items" : "item"
-          }）`;
+          })`;
         } catch (error) {
-          console.error("生成操作序列描述失败:", error);
-          // 使用默认名称作为后备
-          sequenceName = `操作序列（${sequenceActions.length}${
-            sequenceActions.length > 1 ? " items" : " item"
-          }）`;
+          console.error("Failed to generate sequence description:", error);
+          // Fallback to a default name
+          sequenceName = `Action sequence (${sequenceActions.length} ${
+            sequenceActions.length > 1 ? "items" : "item"
+          })`;
         }
       } else {
-        // 不使用AI，直接生成描述
-        sequenceName = `操作序列（${sequenceActions.length}${
-          sequenceActions.length > 1 ? " items" : " item"
-        }）`;
+        // No AI: build a simple label
+        sequenceName = `Action sequence (${sequenceActions.length} ${
+          sequenceActions.length > 1 ? "items" : "item"
+        })`;
       }
 
       const event = new CustomEvent("actionSequenceDrop", {
@@ -102,12 +102,12 @@ export const ActionTimeline = () => {
       return;
     }
 
-    // 单个操作也创建为操作序列（包含一个操作）
+    // Single selection also creates a sequence entry
     const event = new CustomEvent("actionSequenceDrop", {
       detail: {
         type: "action-sequence",
-        name: action.description, // 使用操作描述作为名称
-        actions: [action], // 包含单个操作的数组
+        name: action.description,
+        actions: [action],
       },
     });
     window.dispatchEvent(event);
@@ -145,8 +145,8 @@ export const ActionTimeline = () => {
     label: string;
     count: number;
   }> = [
-    { key: "history", label: "操作历史", count: actions.length },
-    { key: "logic", label: "交互逻辑", count: logicEntities.length },
+    { key: "history", label: "Action History", count: actions.length },
+    { key: "logic", label: "Interaction Logic", count: logicEntities.length },
   ];
 
   const handleLogicInsert = (entity: InteractiveLogicEntity) => {
@@ -206,7 +206,7 @@ export const ActionTimeline = () => {
               setSelectedActionIds([]);
             }}
             className="rounded p-1 text-xs text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-            title="清空历史"
+            title="Clear history"
           >
             <TrashIcon className="h-4 w-4" />
           </button>
@@ -292,7 +292,7 @@ export const ActionTimeline = () => {
             </div>
           ) : (
             <div className="flex h-24 items-center justify-center text-sm text-gray-400">
-              暂无操作历史
+              No recorded actions yet
             </div>
           )
         ) : hasLogic ? (
@@ -308,7 +308,7 @@ export const ActionTimeline = () => {
                       {entity.name}
                     </div>
                     <div className="mt-1 text-xs text-gray-500">
-                      目标元素：{entity.elementName}
+                      Target element: {entity.elementName}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -317,13 +317,13 @@ export const ActionTimeline = () => {
                       className="rounded border border-emerald-500 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50"
                       onClick={() => handleLogicInsert(entity)}
                     >
-                      引用
+                      Insert
                     </button>
                     <button
                       type="button"
                       className="rounded border border-gray-300 p-1 text-gray-500 hover:bg-gray-100"
                       onClick={() => handleLogicEdit(entity)}
-                      title="编辑交互逻辑"
+                      title="Edit interaction logic"
                     >
                       <PencilSquareIcon className="h-4 w-4" />
                     </button>
@@ -343,7 +343,7 @@ export const ActionTimeline = () => {
           </div>
         ) : (
           <div className="flex h-24 items-center justify-center text-sm text-gray-400">
-            暂无交互逻辑
+            No saved interaction logic yet
           </div>
         )}
       </div>

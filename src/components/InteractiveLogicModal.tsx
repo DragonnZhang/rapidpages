@@ -37,7 +37,8 @@ export const InteractiveLogicModal = () => {
     }
 
     if (modalState.mode === "create") {
-      const defaultName = modalState.elementDetail?.elementName ?? "交互逻辑";
+      const defaultName =
+        modalState.elementDetail?.elementName ?? "Interaction logic";
       setName(defaultName);
       setLogic("");
     } else if (modalState.mode === "edit" && editingEntity) {
@@ -52,12 +53,12 @@ export const InteractiveLogicModal = () => {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("请为交互逻辑命名");
+      toast.error("Please give this interaction logic a name.");
       return;
     }
 
     if (!logic.trim()) {
-      toast.error("请输入交互逻辑内容");
+      toast.error("Please describe the interaction logic.");
       return;
     }
 
@@ -67,7 +68,9 @@ export const InteractiveLogicModal = () => {
     if (modalState.mode === "create") {
       const elementDetail = modalState.elementDetail;
       if (!elementDetail) {
-        toast.error("缺少元素信息，无法创建交互逻辑");
+        toast.error(
+          "Missing element information—unable to create interaction logic.",
+        );
         setSaving(false);
         return;
       }
@@ -95,7 +98,7 @@ export const InteractiveLogicModal = () => {
         }),
       );
 
-      toast.success("交互逻辑已保存");
+      toast.success("Interaction logic saved.");
     } else if (modalState.mode === "edit" && modalState.entityId) {
       let updatedEntity: InteractiveLogicEntity | undefined = undefined;
 
@@ -125,7 +128,7 @@ export const InteractiveLogicModal = () => {
             },
           }),
         );
-        toast.success("交互逻辑已更新");
+        toast.success("Interaction logic updated.");
       }
     }
 
@@ -163,8 +166,8 @@ export const InteractiveLogicModal = () => {
                 <div className="flex items-start justify-between">
                   <Dialog.Title className="text-lg font-semibold text-gray-900">
                     {modalState.mode === "create"
-                      ? "保存交互逻辑"
-                      : "编辑交互逻辑"}
+                      ? "Save interaction logic"
+                      : "Edit interaction logic"}
                   </Dialog.Title>
                   <button
                     type="button"
@@ -177,7 +180,9 @@ export const InteractiveLogicModal = () => {
 
                 {modalState.elementDetail && modalState.mode === "create" && (
                   <div className="mt-4 rounded-lg bg-gray-100 p-3 text-sm text-gray-600">
-                    <div className="font-medium text-gray-800">已选元素</div>
+                    <div className="font-medium text-gray-800">
+                      Selected element
+                    </div>
                     <div className="mt-1 text-gray-700">
                       {modalState.elementDetail.elementName}
                     </div>
@@ -190,7 +195,7 @@ export const InteractiveLogicModal = () => {
                       htmlFor="interactive-logic-name"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      名称
+                      Name
                     </label>
                     <input
                       id="interactive-logic-name"
@@ -198,7 +203,7 @@ export const InteractiveLogicModal = () => {
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="例如：点击提交按钮后的验证逻辑"
+                      placeholder="Example: Validation logic after clicking the submit button"
                     />
                   </div>
 
@@ -207,7 +212,7 @@ export const InteractiveLogicModal = () => {
                       htmlFor="interactive-logic-content"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      交互逻辑描述
+                      Interaction logic description
                     </label>
                     <textarea
                       id="interactive-logic-content"
@@ -215,7 +220,7 @@ export const InteractiveLogicModal = () => {
                       onChange={(event) => setLogic(event.target.value)}
                       rows={6}
                       className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="说明交互逻辑或流程，例如：当用户点击提交按钮时，如果表单未填写完整则弹出提示 ..."
+                      placeholder="Describe the interaction logic or flow, e.g., when a user clicks Submit, show a warning if the form is incomplete."
                     />
                   </div>
                 </div>
@@ -227,7 +232,7 @@ export const InteractiveLogicModal = () => {
                     onClick={closeModal}
                     disabled={saving}
                   >
-                    取消
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -235,7 +240,7 @@ export const InteractiveLogicModal = () => {
                     onClick={handleSave}
                     disabled={saving}
                   >
-                    {saving ? "保存中..." : "保存"}
+                    {saving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </Dialog.Panel>
