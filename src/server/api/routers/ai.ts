@@ -10,7 +10,7 @@ export const aiRouter = createTRPCRouter({
   generateDescription: publicProcedure
     .input(
       z.object({
-        type: z.enum(["element", "action-sequence"]),
+        type: z.enum(["element", "action-sequence", "logic"]),
         content: z.string(),
         context: z.string().optional(),
       }),
@@ -48,6 +48,19 @@ export const aiRouter = createTRPCRouter({
           content,
           context ? `Context information: ${context}` : "",
         ].join("\n");
+      } else if (type === "logic") {
+        systemPrompt = [
+          "You are an interaction design expert who needs to generate brief descriptions for interactive logic.",
+          "Descriptions should clearly express the trigger condition and behavior result, such as: Form Validation, Show Modal, Toggle Menu, Update Display, etc.",
+          "Descriptions should be within 2-6 words in English, highlighting the core purpose of the interaction.",
+          "Only return the description text, without any other content.",
+        ].join("\n");
+
+        userPrompt = [
+          "Please generate a brief description for the following interactive logic:",
+          content,
+          context ? `Bound element: ${context}` : "",
+        ].join("\n");
       }
 
       try {
@@ -74,8 +87,10 @@ export const aiRouter = createTRPCRouter({
         // 返回默认描述
         if (type === "element") {
           return { description: "Page Element" };
-        } else {
+        } else if (type === "action-sequence") {
           return { description: "User Action" };
+        } else {
+          return { description: "Interactive Logic" };
         }
       }
     }),

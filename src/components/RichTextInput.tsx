@@ -14,6 +14,7 @@ import {
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { useSetAtom } from "jotai";
 import { interactiveLogicModalAtom } from "~/store/interactiveLogicStore";
+import { api } from "~/utils/api";
 
 interface RichTextInputProps {
   onSubmit: (content: RichTextContent) => void;
@@ -53,6 +54,9 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const setLogicModalState = useSetAtom(interactiveLogicModalAtom);
+
+  // AI 描述生成 mutation
+  const generateDescription = api.ai.generateDescription.useMutation();
 
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
@@ -574,7 +578,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
   // 处理元素选择
   const handleElementDrop = useCallback(
-    (elementData: { type: string; name: string; content: string }) => {
+    async (elementData: { type: string; name: string; content: string }) => {
       const mediaItem: MediaItem = {
         id: generateId(),
         type: "element",
@@ -585,19 +589,32 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
+      // 生成 AI 描述
+      let displayName = elementData.name;
+      try {
+        const result = await generateDescription.mutateAsync({
+          type: "element",
+          content: elementData.content,
+        });
+        displayName = result.description || elementData.name;
+      } catch (error) {
+        console.error("生成元素描述失败:", error);
+        // 使用默认名称
+      }
+
       // 创建badge
       const newBadge: MediaBadge = {
         id: mediaItem.id,
         filename: elementData.name,
         type: "element",
-        displayName: elementData.name,
+        displayName: displayName,
       };
 
       insertBadge(mediaItem, newBadge);
 
       return mediaItem;
     },
-    [insertBadge],
+    [insertBadge, generateDescription],
   );
 
   // 监听元素选择事件
@@ -621,7 +638,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
   // 处理操作记录
   const handleActionDrop = useCallback(
-    (actionData: { type: string; name: string; content: string }) => {
+    async (actionData: { type: string; name: string; content: string }) => {
       // 将单个操作也创建为 action-sequence 类型，只是只包含一个操作
       const singleActionRecord: ActionRecord = {
         id: Math.random().toString(36).substring(2, 15),
@@ -645,20 +662,33 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
+      // 生成 AI 描述
+      let displayName = actionData.name;
+      try {
+        const result = await generateDescription.mutateAsync({
+          type: "action-sequence",
+          content: actionData.content,
+        });
+        displayName = result.description || actionData.name;
+      } catch (error) {
+        console.error("生成操作描述失败:", error);
+        // 使用默认名称
+      }
+
       // 创建badge
       const newBadge: MediaBadge = {
         id: mediaItem.id,
         filename: actionData.name,
         type: "action-sequence",
         actionSequence: [singleActionRecord],
-        displayName: actionData.name,
+        displayName: displayName,
       };
 
       insertBadge(mediaItem, newBadge);
 
       return mediaItem;
     },
-    [insertBadge],
+    [insertBadge, generateDescription],
   );
 
   // 监听操作记录事件
@@ -682,7 +712,11 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
   // 处理操作序列
   const handleActionSequenceDrop = useCallback(
-    (sequenceData: { type: string; name: string; actions: ActionRecord[] }) => {
+    async (sequenceData: {
+      type: string;
+      name: string;
+      actions: ActionRecord[];
+    }) => {
       const mediaItem: MediaItem = {
         id: generateId(),
         type: "action-sequence",
@@ -694,20 +728,37 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
+      // 生成 AI 描述
+      let displayName = sequenceData.name;
+      try {
+        const actionsDescription = sequenceData.actions
+          .map((action) => `${action.type}: ${action.description}`)
+          .join("\n");
+
+        const result = await generateDescription.mutateAsync({
+          type: "action-sequence",
+          content: actionsDescription,
+        });
+        displayName = result.description || sequenceData.name;
+      } catch (error) {
+        console.error("生成操作序列描述失败:", error);
+        // 使用默认名称
+      }
+
       // 创建badge
       const newBadge: MediaBadge = {
         id: mediaItem.id,
         filename: sequenceData.name,
         type: "action-sequence",
         actionSequence: sequenceData.actions,
-        displayName: sequenceData.name,
+        displayName: displayName,
       };
 
       insertBadge(mediaItem, newBadge);
 
       return mediaItem;
     },
-    [insertBadge],
+    [insertBadge, generateDescription],
   );
 
   // 监听操作序列事件
@@ -730,7 +781,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
   }, [handleActionSequenceDrop]);
 
   const handleLogicEntityDrop = useCallback(
-    (detail: {
+    async (detail: {
       id: string;
       name: string;
       logic: string;
@@ -748,11 +799,25 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       setMedia((prev) => [...prev, mediaItem]);
 
+      // 生成 AI 描述
+      let displayName = detail.name;
+      try {
+        const result = await generateDescription.mutateAsync({
+          type: "logic",
+          content: detail.logic,
+          context: detail.elementName,
+        });
+        displayName = result.description || detail.name;
+      } catch (error) {
+        console.error("生成交互逻辑描述失败:", error);
+        // 使用默认名称
+      }
+
       const newBadge: MediaBadge = {
         id: mediaItem.id,
         filename: detail.name,
         type: "logic",
-        displayName: detail.name,
+        displayName: displayName,
         logicId: detail.id,
         logicContent: detail.logic,
         elementName: detail.elementName,
@@ -762,7 +827,7 @@ export const RichTextInput: React.FC<RichTextInputProps> = ({
 
       return mediaItem;
     },
-    [insertBadge],
+    [insertBadge, generateDescription],
   );
 
   useEffect(() => {
