@@ -333,12 +333,6 @@ export const ActionTimeline = () => {
                   <div className="mt-2 line-clamp-3 text-xs leading-5 text-gray-600">
                     {entity.logic}
                   </div>
-                  <div className="mt-3 text-[10px] uppercase tracking-wide text-gray-400">
-                    {formatDistanceToNow(new Date(entity.updatedAt), {
-                      addSuffix: true,
-                      locale: zhCN,
-                    })}
-                  </div>
                 </div>
               ))}
             </div>
