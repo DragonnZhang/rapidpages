@@ -38,7 +38,7 @@ export const aiRouter = createTRPCRouter({
       } else if (type === "action-sequence") {
         systemPrompt = [
           "You are a user experience analysis expert who needs to generate brief descriptions for user action sequences.",
-          "Descriptions should summarize the user's main operational intent, such as: Form Filling, Product Search, Login Process, Content Editing, etc.",
+          "Descriptions should summarize the user's main operational intent, such as: Form Filling, Product Search, Login Process, Content Editing, Button Clicking, etc.",
           "Descriptions should be within 2-6 words in English, highlighting the core purpose of the operation.",
           "Only return the description text, without any other content.",
         ].join("\n");
