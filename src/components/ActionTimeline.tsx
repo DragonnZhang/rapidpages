@@ -296,50 +296,52 @@ export const ActionTimeline = () => {
             </div>
           )
         ) : hasLogic ? (
-          <div className="space-y-3">
-            {sortedLogicEntities.map((entity) => (
-              <div
-                key={entity.id}
-                className="group flex flex-col rounded-lg border border-transparent bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900">
-                      {entity.name}
+          <div className="overflow-x-auto">
+            <div className="flex gap-3 pb-2">
+              {sortedLogicEntities.map((entity) => (
+                <div
+                  key={entity.id}
+                  className="group flex min-w-[28rem] flex-shrink-0 flex-col rounded-lg border border-transparent bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-gray-900">
+                        {entity.name}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-gray-500">
+                        Target element: {entity.elementName}
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      Target element: {entity.elementName}
+                    <div className="flex flex-shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        className="rounded border border-emerald-500 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50"
+                        onClick={() => handleLogicInsert(entity)}
+                      >
+                        Insert
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-gray-300 p-1 text-gray-500 hover:bg-gray-100"
+                        onClick={() => handleLogicEdit(entity)}
+                        title="Edit interaction logic"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      className="rounded border border-emerald-500 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50"
-                      onClick={() => handleLogicInsert(entity)}
-                    >
-                      Insert
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-gray-300 p-1 text-gray-500 hover:bg-gray-100"
-                      onClick={() => handleLogicEdit(entity)}
-                      title="Edit interaction logic"
-                    >
-                      <PencilSquareIcon className="h-4 w-4" />
-                    </button>
+                  <div className="mt-2 line-clamp-3 text-xs leading-5 text-gray-600">
+                    {entity.logic}
+                  </div>
+                  <div className="mt-3 text-[10px] uppercase tracking-wide text-gray-400">
+                    {formatDistanceToNow(new Date(entity.updatedAt), {
+                      addSuffix: true,
+                      locale: zhCN,
+                    })}
                   </div>
                 </div>
-                <div className="mt-2 line-clamp-3 text-xs leading-5 text-gray-600">
-                  {entity.logic}
-                </div>
-                <div className="mt-3 text-[10px] uppercase tracking-wide text-gray-400">
-                  {formatDistanceToNow(new Date(entity.updatedAt), {
-                    addSuffix: true,
-                    locale: zhCN,
-                  })}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex h-24 items-center justify-center text-sm text-gray-400">

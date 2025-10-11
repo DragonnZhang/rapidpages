@@ -98,7 +98,7 @@ export const InteractiveLogicModal = () => {
         }),
       );
 
-      toast.success("Interaction logic saved.");
+      // toast.success("Interaction logic saved.");
     } else if (modalState.mode === "edit" && modalState.entityId) {
       let updatedEntity: InteractiveLogicEntity | undefined = undefined;
 
@@ -128,7 +128,7 @@ export const InteractiveLogicModal = () => {
             },
           }),
         );
-        toast.success("Interaction logic updated.");
+        // toast.success("Interaction logic updated.");
       }
     }
 
