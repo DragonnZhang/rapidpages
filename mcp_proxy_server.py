@@ -5,6 +5,7 @@ import uvicorn
 from fastmcp import FastMCP
 from fastmcp.client.transports import StdioTransport
 from fastmcp.server.proxy import ProxyClient
+from starlette.middleware.cors import CORSMiddleware
 
 CONFIG_PATH = Path(__file__).parent / "mcp-config.json"
 
@@ -49,5 +50,14 @@ if __name__ == '__main__':
     
     mcp_server = build_mcp_proxy(args.server)
     app = mcp_server.http_app(stateless_http=True)
+    
+    # Add CORS middleware to handle browser requests
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

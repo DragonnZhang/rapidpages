@@ -100,24 +100,24 @@ export const InteractiveLogicModal = () => {
 
       // toast.success("Interaction logic saved.");
     } else if (modalState.mode === "edit" && modalState.entityId) {
-      let updatedEntity: InteractiveLogicEntity | undefined = undefined;
-
-      setLogicEntities((prev) =>
-        prev.map((entity) => {
-          if (entity.id === modalState.entityId) {
-            updatedEntity = {
-              ...entity,
-              name: name.trim(),
-              logic: logic.trim(),
-              updatedAt: now,
-            };
-            return updatedEntity;
-          }
-          return entity;
-        }),
+      const entityToUpdate = logicEntities.find(
+        (e) => e.id === modalState.entityId,
       );
 
-      if (updatedEntity) {
+      if (entityToUpdate) {
+        const updatedEntity: InteractiveLogicEntity = {
+          ...entityToUpdate,
+          name: name.trim(),
+          logic: logic.trim(),
+          updatedAt: now,
+        };
+
+        setLogicEntities((prev) =>
+          prev.map((entity) =>
+            entity.id === modalState.entityId ? updatedEntity : entity,
+          ),
+        );
+
         window.dispatchEvent(
           new CustomEvent("logicEntityUpdated", {
             detail: {
@@ -128,7 +128,6 @@ export const InteractiveLogicModal = () => {
             },
           }),
         );
-        // toast.success("Interaction logic updated.");
       }
     }
 
