@@ -1,6 +1,7 @@
 import { componentRouter } from "~/server/api/routers/component";
 import { userRouter } from "~/server/api/routers/user";
 import { aiRouter } from "~/server/api/routers/ai";
+import { mcpRouter } from "~/server/api/routers/mcp";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
 /**
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   component: componentRouter,
   user: userRouter,
   ai: aiRouter,
+  mcp: mcpRouter,
 });
 
 // export type definition of API
