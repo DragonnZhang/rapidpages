@@ -21,6 +21,7 @@ import { api } from "~/utils/api";
 import { type ComponentFile } from "~/utils/compiler";
 import { ActionTimeline } from "./ActionTimeline";
 import { InteractiveLogicModal } from "./InteractiveLogicModal";
+import { McpTestButton } from "./McpTestButton";
 import { useSetAtom } from "jotai";
 import {
   interactiveLogicModalAtom,
@@ -137,6 +138,7 @@ export const EditorTabs = ({
               </Tab>
             </Tab.List>
             <div className="ml-auto flex items-center gap-2">
+              <McpTestButton />
               {/* Canvas 模式下显示的操作按钮 */}
               {selectedIndex === 0 && (
                 <>

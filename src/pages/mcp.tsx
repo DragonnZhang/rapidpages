@@ -1,104 +1,62 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import Head from "next/head";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ApplicationLayout as AppLayout } from "~/components/AppLayout";
 import { Button } from "~/components/Button";
 import { Spinner } from "~/components/Spinner";
 import { toast } from "react-hot-toast";
-
-interface Tool {
-  name: string;
-  description?: string;
-  [key: string]: unknown;
-}
+import { useMcpClient } from "~/hooks/useMcpClient";
 
 const MCPClientPage = () => {
-  const [serverUrl, setServerUrl] = useState("http://localhost:8000/mcp");
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [tools, setTools] = useState<Tool[]>([]);
+  const {
+    serverUrl,
+    setServerUrl,
+    isConnected,
+    isConnecting,
+    isRunning,
+    tools,
+    result,
+    error,
+    connect,
+    disconnect,
+    runTool: runToolFromHook,
+  } = useMcpClient();
+
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [args, setArgs] = useState("{}");
-  const [result, setResult] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const clientRef = useRef<Client | null>(null);
-
-  const connect = async () => {
-    if (!serverUrl) return;
-
-    setIsConnecting(true);
-    setError(null);
+  const handleConnect = async () => {
     try {
-      console.log("Connecting to:", serverUrl);
-      const transport = new StreamableHTTPClientTransport(new URL(serverUrl));
-      const client = new Client({
-        name: "rapidpages-client",
-        version: "1.0.0",
-      });
-
-      await client.connect(transport);
-      clientRef.current = client;
-      setIsConnected(true);
+      await connect();
       toast.success("Connected to MCP Server");
-
-      // Fetch tools
-      const toolsList = await client.listTools();
-      setTools(toolsList.tools as Tool[]);
     } catch (error) {
-      console.error("Connection failed:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      setError(errorMsg);
       toast.error(`Failed to connect: ${errorMsg}`);
-    } finally {
-      setIsConnecting(false);
     }
   };
 
-  const disconnect = async () => {
-    if (clientRef.current) {
-      await clientRef.current.close();
-      clientRef.current = null;
-    }
-    setIsConnected(false);
-    setTools([]);
-    setSelectedTool(null);
-    setResult(null);
-  };
+  const handleRunTool = async () => {
+    if (!selectedTool) return;
 
-  const runTool = async () => {
-    if (!clientRef.current || !selectedTool) return;
-
-    setIsRunning(true);
-    setResult(null);
     try {
       let parsedArgs = {};
       try {
         parsedArgs = JSON.parse(args);
       } catch (e) {
         toast.error("Invalid JSON arguments");
-        setIsRunning(false);
         return;
       }
 
-      const result = await clientRef.current.callTool({
-        name: selectedTool,
-        arguments: parsedArgs,
-      });
-
-      setResult(JSON.stringify(result, null, 2));
+      await runToolFromHook(selectedTool, parsedArgs);
+      toast.success("Tool executed");
+      // we rely on hook state to set result
     } catch (error: unknown) {
-      console.error("Tool execution failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      setResult(`Error: ${errorMessage}`);
       toast.error("Tool execution failed");
-    } finally {
-      setIsRunning(false);
     }
   };
+
+  const hasResult = result !== null && result !== undefined;
+  const formattedResult =
+    typeof result === "string" ? result : JSON.stringify(result, null, 2);
 
   return (
     <AppLayout>
@@ -119,14 +77,13 @@ const MCPClientPage = () => {
               value={serverUrl}
               onChange={(e) => {
                 setServerUrl(e.target.value);
-                setError(null);
               }}
               placeholder="Enter HTTP Endpoint URL (e.g., http://localhost:8000)"
               className="flex-1 rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               disabled={isConnected}
             />
             {!isConnected ? (
-              <Button onClick={connect} disabled={isConnecting}>
+              <Button onClick={handleConnect} disabled={isConnecting}>
                 {isConnecting ? (
                   <div className="flex items-center gap-2">
                     <Spinner /> Connecting...
@@ -136,7 +93,13 @@ const MCPClientPage = () => {
                 )}
               </Button>
             ) : (
-              <Button onClick={disconnect} variant="secondary">
+              <Button
+                onClick={() => {
+                  void disconnect();
+                  setSelectedTool(null);
+                }}
+                variant="secondary"
+              >
                 Disconnect
               </Button>
             )}
@@ -168,7 +131,6 @@ const MCPClientPage = () => {
                     key={tool.name}
                     onClick={() => {
                       setSelectedTool(tool.name);
-                      setResult(null);
                     }}
                     className={`w-full rounded px-4 py-2 text-left transition-colors ${
                       selectedTool === tool.name
@@ -214,7 +176,7 @@ const MCPClientPage = () => {
                   </div>
 
                   <Button
-                    onClick={runTool}
+                    onClick={handleRunTool}
                     disabled={isRunning}
                     className="w-full justify-center"
                   >
@@ -227,13 +189,13 @@ const MCPClientPage = () => {
                     )}
                   </Button>
 
-                  {result && (
+                  {hasResult && (
                     <div className="mt-6">
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Result
                       </label>
                       <pre className="max-h-96 w-full overflow-auto rounded border border-gray-700 bg-gray-900 p-4 font-mono text-sm text-green-400">
-                        {result}
+                        {formattedResult}
                       </pre>
                     </div>
                   )}
