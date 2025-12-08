@@ -41,12 +41,10 @@ export const mcpRouter = createTRPCRouter({
           }),
         ),
         mcpServerUrl: z.string(), // MCP server URL
-        maxIterations: z.number().int().positive().default(10),
       }),
     )
     .mutation(async ({ input }) => {
-      const { promptText, toolDefinitions, mcpServerUrl, maxIterations } =
-        input;
+      const { promptText, toolDefinitions, mcpServerUrl } = input;
 
       console.log("🚀 ~ toolDefinitions:", toolDefinitions);
 
@@ -85,6 +83,10 @@ When you need to accomplish a task:
 2. Call the appropriate tools to complete the task
 3. Use the tool results to inform your next steps
 4. Continue until the task is completed
+5. When the task is fully completed, respond with a summary of what was accomplished WITHOUT calling any more tools
+
+IMPORTANT: When you have completed the task successfully, do NOT call any more tools. 
+Instead, provide a clear summary message starting with "Task completed:" to indicate you are done.
 
 Always use the available tools to help achieve the goal.`;
 
@@ -177,9 +179,12 @@ Always use the available tools to help achieve the goal.`;
       }
 
       try {
-        for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let iteration = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          iteration++;
           // eslint-disable-next-line no-console
-          console.log(`\n=== Agent Loop Iteration ${iteration + 1} ===`);
+          console.log(`\n=== Agent Loop Iteration ${iteration} ===`);
 
           // Call AI with tools
           const aiResponse = await generateText({
@@ -200,7 +205,7 @@ Always use the available tools to help achieve the goal.`;
           // eslint-disable-next-line no-console
           console.log(`Tool calls: ${toolCalls.length}, Text: ${textContent}`);
 
-          // If no tool calls and model provided text, task might be complete
+          // If no tool calls, check if task is complete
           if (toolCalls.length === 0) {
             const step: AgentLoopStep = {
               toolCall: null,
@@ -209,17 +214,36 @@ Always use the available tools to help achieve the goal.`;
             };
             steps.push(step);
 
-            // eslint-disable-next-line no-console
-            console.log("Task completed. Final response:", textContent);
+            // Check if AI indicates task completion
+            const isTaskComplete =
+              textContent.toLowerCase().includes("task completed") ||
+              textContent.toLowerCase().includes("任务完成") ||
+              textContent.toLowerCase().includes("successfully completed") ||
+              textContent.toLowerCase().includes("已完成");
 
-            await client.close();
+            if (isTaskComplete) {
+              // eslint-disable-next-line no-console
+              console.log("Task completed by AI. Final response:", textContent);
 
-            return {
-              success: true,
-              message: textContent,
-              steps,
-              iterations: iteration + 1,
-            };
+              await client.close();
+
+              return {
+                success: true,
+                message: textContent,
+                steps,
+                iterations: iteration,
+              };
+            }
+
+            // If AI just provided reasoning without tools and without completion signal,
+            // ask it to either use tools or confirm completion
+            messages.push({
+              role: "user",
+              content:
+                "Please either call the necessary tools to continue the task, or if the task is complete, provide a summary starting with 'Task completed:'",
+            });
+
+            continue;
           }
 
           // Add assistant response to messages
@@ -287,15 +311,6 @@ Always use the available tools to help achieve the goal.`;
             steps.push(step);
           }
         }
-
-        // Max iterations reached
-        await client.close();
-
-        return {
-          success: false,
-          error: `Max iterations (${maxIterations}) reached without completing task`,
-          steps,
-        };
       } catch (error) {
         console.error("Agent Loop Failed:", error);
         await client.close();
