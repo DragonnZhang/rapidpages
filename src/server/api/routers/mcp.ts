@@ -82,13 +82,26 @@ When you need to accomplish a task:
 1. Analyze the user's instruction
 2. Call the appropriate tools to complete the task
 3. Use the tool results to inform your next steps
-4. Continue until the task is completed
-5. When the task is fully completed, respond with a summary of what was accomplished WITHOUT calling any more tools
+4. Continue until the task is completed OR you encounter a UI issue
 
-IMPORTANT: When you have completed the task successfully, do NOT call any more tools. 
-Instead, provide a clear summary message starting with "Task completed:" to indicate you are done.
+CRITICAL - ERROR DETECTION:
+- If you attempt the same action 2-3 times and it consistently fails, DO NOT retry infinitely
+- If an input field cannot accept text after multiple attempts, this is a UI BUG
+- If a button click has no effect after retrying, this is a UI BUG
+- If expected elements are missing or unresponsive, this is a UI BUG
 
-Always use the available tools to help achieve the goal.`;
+When you detect a UI issue or bug:
+1. STOP attempting the failed action immediately
+2. Respond with "UI Error:" followed by a clear description of the problem
+3. Include what you were trying to do and what went wrong
+
+When the task is completed successfully:
+- Respond with "Task completed:" followed by a summary
+
+IMPORTANT: 
+- Do NOT retry the same failing action more than 2-3 times
+- Recognize when something is broken and report it immediately
+- Both successful completion and error detection should stop tool calling`;
 
       // Build tools array for the AI model (only once, outside the loop)
       const aiTools: Record<string, Tool> = {};
@@ -221,6 +234,13 @@ Always use the available tools to help achieve the goal.`;
               textContent.toLowerCase().includes("successfully completed") ||
               textContent.toLowerCase().includes("已完成");
 
+            // Check if AI detected a UI error
+            const isUIError =
+              textContent.toLowerCase().includes("ui error:") ||
+              textContent.toLowerCase().includes("ui 错误:") ||
+              textContent.toLowerCase().includes("ui bug") ||
+              textContent.toLowerCase().includes("界面错误");
+
             if (isTaskComplete) {
               // eslint-disable-next-line no-console
               console.log("Task completed by AI. Final response:", textContent);
@@ -235,12 +255,27 @@ Always use the available tools to help achieve the goal.`;
               };
             }
 
+            if (isUIError) {
+              // eslint-disable-next-line no-console
+              console.log("UI Error detected by AI:", textContent);
+
+              await client.close();
+
+              return {
+                success: false,
+                error: textContent,
+                errorType: "UI_ERROR",
+                steps,
+                iterations: iteration,
+              };
+            }
+
             // If AI just provided reasoning without tools and without completion signal,
             // ask it to either use tools or confirm completion
             messages.push({
               role: "user",
               content:
-                "Please either call the necessary tools to continue the task, or if the task is complete, provide a summary starting with 'Task completed:'",
+                "Please either call the necessary tools to continue the task, or if the task is complete, provide a summary starting with 'Task completed:', or if you encountered a UI issue, report it starting with 'UI Error:'",
             });
 
             continue;
