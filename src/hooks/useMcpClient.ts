@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 export interface McpTool {
   name: string;
   description?: string;
+  input_schema?: unknown;
   [key: string]: unknown;
 }
 
@@ -54,7 +55,13 @@ export const useMcpClient = (options: UseMcpClientOptions = {}) => {
         setIsConnected(true);
 
         const toolsList = await client.listTools();
-        const formattedTools = toolsList.tools as McpTool[];
+        const formattedTools = toolsList.tools.map((tool) => {
+          return {
+            name: tool.name,
+            description: tool.description,
+            input_schema: tool.inputSchema,
+          };
+        });
         setTools(formattedTools);
         return formattedTools;
       } catch (err) {

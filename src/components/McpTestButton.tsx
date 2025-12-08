@@ -18,7 +18,7 @@ export const McpTestButton = ({ className }: McpTestButtonProps) => {
     disconnect,
     error,
     tools,
-    runTool,
+    serverUrl,
   } = useMcpClient();
 
   const [isTesting, setIsTesting] = useState(false);
@@ -26,7 +26,7 @@ export const McpTestButton = ({ className }: McpTestButtonProps) => {
   const [testPrompt, setTestPrompt] = useState("");
 
   // tRPC mutations
-  const decideToolCall = api.mcp.decideToolCall.useMutation();
+  const agentLoop = api.mcp.agentLoop.useMutation();
 
   const handleConnect = useCallback(async () => {
     try {
@@ -62,40 +62,44 @@ export const McpTestButton = ({ className }: McpTestButtonProps) => {
       const toolsList = tools.map((tool) => ({
         name: tool.name,
         description: tool.description ?? undefined,
+        input_schema: tool.input_schema,
       }));
 
-      // 调用 AI 模型决策需要使用的工具
-      const aiResult = await decideToolCall.mutateAsync({
+      toast.loading("Running agentic loop...");
+
+      // 调用 agentic loop
+      const result = await agentLoop.mutateAsync({
         promptText: testPrompt,
-        tools: toolsList,
+        toolDefinitions: toolsList,
+        mcpServerUrl: serverUrl,
+        maxIterations: 10,
       });
 
-      if (!aiResult.success) {
-        throw new Error(aiResult.error ?? "AI decision failed");
+      if (!result.success) {
+        throw new Error(result.error ?? "Agent loop failed");
       }
 
-      const decision = aiResult.decision;
-      if (!decision) {
-        throw new Error("No decision returned from AI");
-      }
+      // 格式化结果
+      const stepsText = result.steps
+        ?.map((step, idx) => {
+          let text = `Step ${idx + 1}:\n`;
+          if (step.reasoning) {
+            text += `  Reasoning: ${step.reasoning}\n`;
+          }
+          if (step.toolCall) {
+            text += `  Tool: ${step.toolCall.name}\n`;
+            text += `  Args: ${JSON.stringify(step.toolCall.args)}\n`;
+          }
+          if (step.toolResult) {
+            text += `  Result: ${JSON.stringify(step.toolResult.result)}\n`;
+          }
+          return text;
+        })
+        .join("\n");
 
-      if (!decision.tool) {
-        const reason = decision.reason ?? "No suitable tool found";
-        toast(reason);
-        setTestResult(`No tool executed: ${reason}`);
-        return;
-      }
+      const resultText = `Completed in ${result.iterations} iterations\n\nFinal Message:\n${result.message}\n\nSteps:\n${stepsText}`;
 
-      // 执行工具
-      toast.loading(`Executing tool: ${decision.tool}...`);
-      const toolResult = await runTool(decision.tool, decision.args ?? {});
-
-      const resultText =
-        typeof toolResult === "string"
-          ? toolResult
-          : JSON.stringify(toolResult, null, 2);
-
-      setTestResult(`Tool: ${decision.tool}\n\nResult:\n${resultText}`);
+      setTestResult(resultText);
       toast.success("Test completed successfully");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -104,7 +108,7 @@ export const McpTestButton = ({ className }: McpTestButtonProps) => {
     } finally {
       setIsTesting(false);
     }
-  }, [isConnected, tools, runTool, testPrompt, decideToolCall]);
+  }, [isConnected, tools, serverUrl, testPrompt, agentLoop]);
 
   return (
     <div className="flex flex-col gap-3">

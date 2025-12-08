@@ -27,6 +27,7 @@ export const env = createEnv({
     DOUBAO_API_KEY: z.string(),
 
     MODEL_NAME: z.string().default("deepseek-V3"),
+    MCP_SERVER_URL: z.string().url().default("http://localhost:8000/mcp"),
 
     NEXTAUTH_SECRET:
       process.env.NODE_ENV === "production"
@@ -73,6 +74,7 @@ export const env = createEnv({
     DOUBAO_API_KEY: process.env.DOUBAO_API_KEY,
 
     MODEL_NAME: process.env.MODEL_NAME,
+    MCP_SERVER_URL: process.env.MCP_SERVER_URL,
 
     NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
