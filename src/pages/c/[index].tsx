@@ -6,6 +6,7 @@ import { SideMenu } from "~/components/SideMenu";
 import { EditorTabs } from "~/components/EditorTabs";
 import { ComponentProvider } from "~/context/ComponentProvider";
 import { Chat } from "~/components/Chat";
+import { MultiAgentTestPanel } from "~/components/MultiAgentTestPanel";
 import type {
   InferGetServerSidePropsType,
   GetServerSidePropsContext,
@@ -15,11 +16,17 @@ import { ssgHelper } from "~/utils/ssg";
 import { useSession } from "next-auth/react";
 import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 import { type ComponentFile } from "~/utils/compiler";
+import { useRouter } from "next/router";
 
 const ComponentPage: NextPageWithLayout<
   InferGetServerSidePropsType<typeof getServerSideProps>
 > = ({ component }) => {
   const { data: session } = useSession();
+  const router = useRouter();
+
+  // Check if we should auto-start testing (from /new page)
+  const shouldAutoTest = router.query.autoTest === "true";
+
   // Find the last revision and return it's id
   const lastRevisionId =
     component.revisions[component.revisions.length - 1]!.id;
@@ -46,7 +53,14 @@ const ComponentPage: NextPageWithLayout<
               >
                 <EditorTabs code={codeFiles} revisionId={lastRevisionId} />
                 {session && session.user.id === component.authorId && (
-                  <Chat revisionId={lastRevisionId} />
+                  <>
+                    <MultiAgentTestPanel
+                      componentId={component.id}
+                      componentName={component.name || undefined}
+                      autoStart={shouldAutoTest}
+                    />
+                    <Chat revisionId={lastRevisionId} />
+                  </>
                 )}
               </Panel>
             </PanelGroup>

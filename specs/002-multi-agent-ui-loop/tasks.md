@@ -36,7 +36,7 @@
 - [X] T006 [P] 在 `src/server/api/routers/multiAgent.ts` 中引入 `env`、`getModelByName`、`generateNewComponent`、`reviseComponent`、`mcpRouter` 或 MCP 客户端所需类型，以便后续编排使用
 - [X] T007 [P] 在 `src/server/api/routers/multiAgent.ts` 中按 `data-model.md` 定义 TypeScript 接口/类型（如 `UserRequirement`、`TestRun`、`TestCase`、`TestReport`），并与 `contracts/multi-agent-orchestrator-openapi.md` 对齐
 - [X] T008 在 `src/server/api/routers/multiAgent.ts` 中实现基础的内存存储结构（如 Map 或简单对象）用于保存 `TestRun` 与 `TestReport`，为后续各用户故事共享
-- [X] T009 在 `src/pages/` 下创建新的入口页面文件（如 `multi-agent.tsx`），包含基本布局与通过 `api.multiAgent.startRun` 触发闭环的按钮占位
+- [X] T009 **[架构调整]** 在 `src/pages/c/[index].tsx` 组件详情页集成多智能体测试功能，创建 `src/components/MultiAgentTestPanel.tsx` 组件，直接在现有 UI 上触发测试（替代原计划的独立 multi-agent.tsx 页面）
 
 **Checkpoint**: 多智能体 orchestrator 的路由和数据类型就绪，前端页面可以成功调用 `startRun` 并获得占位响应。
 
@@ -58,8 +58,8 @@
 - [X] T015 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现简单的 `TestReport` 生成逻辑：基于一次执行结果构建 `summary` 与 `stats`，存入内存结构
 - [X] T016 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getRunStatus`，返回当前 `TestRun` 的 `status`、`currentIterationIndex` 与基础 `timeline` 信息（至少包含 `requirement-parsing`、`ui-generation`、`testcase-generation`、`test-execution`、`report-generation` 阶段）
 - [X] T017 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getReport`，返回完整的 `TestReport`
-- [X] T018 [P] [US1] 在 `src/pages/multi-agent.tsx` 中实现“需求输入 + 启动按钮 + 运行状态展示”UI，使用 `api.multiAgent.startRun` 和 `api.multiAgent.getRunStatus` 轮询或刷新界面
-- [X] T019 [P] [US1] 在 `src/pages/multi-agent.tsx` 或新建组件（如 `src/components/MultiAgentRunTimeline.tsx`）中使用 `timeline` 渲染基础阶段列表，并在完成后展示 `getReport` 返回的统计信息
+- [X] T018 [P] [US1] **[架构调整]** 在 `src/components/MultiAgentTestPanel.tsx` 中实现测试按钮 + 可折叠面板 + 运行状态展示，使用 `api.multiAgent.startRun` 和 `api.multiAgent.getRunStatus` 轮询或刷新界面
+- [X] T019 [P] [US1] 在 `src/components/MultiAgentRunTimeline.tsx` 中使用 `timeline` 渲染基础阶段列表，集成到 `MultiAgentTestPanel` 中，并在完成后展示 `getReport` 返回的统计信息
 
 **Checkpoint**: 用户可以在 `multi-agent` 页面输入需求并获得一次完整（单轮）的 UI 生成+测试+报告闭环，尚未包含失败驱动迭代逻辑。
 

@@ -79,7 +79,8 @@ const NewPage: NextPageWithLayout = () => {
         throw new Error("Failed to generate component");
       }
       const { componentId } = result.data;
-      await router.push(`/c/${componentId}`);
+      // Add auto-test flag to URL so /c/[id] page knows to start testing
+      await router.push(`/c/${componentId}?autoTest=true`);
       return;
     } catch (e) {
       console.error("🚀 ~ handleGenerateComponent error:", e);

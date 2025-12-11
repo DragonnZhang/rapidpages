@@ -5,6 +5,8 @@ import { getModelByName } from "~/utils/utils";
 import { generateNewComponent, reviseComponent } from "~/server/openai";
 import type { ComponentFile } from "~/utils/compiler";
 import { generateText } from "ai";
+import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
+import type { MediaItem } from "~/types/multimodal";
 
 // ============================================================================
 // Data Types (from data-model.md)
@@ -101,6 +103,7 @@ export interface TestRun {
   maxIterations: number;
   testCases: TestCase[];
   iterations: IterationCycle[];
+  componentId?: string;
 }
 
 export interface TestReport {
@@ -220,8 +223,9 @@ Respond with ONLY valid JSON matching this schema:
 async function generateInitialUi(
   requirementText: string,
   uiVersionId: string,
+  media?: MediaItem[],
 ): Promise<UiVersion> {
-  const files = await generateNewComponent(requirementText);
+  const files = await generateNewComponent(requirementText, media);
 
   const uiVersion: UiVersion = {
     id: uiVersionId,
@@ -392,8 +396,14 @@ async function runIterativeTestingLoop(
     "Evaluator",
     "Running initial tests...",
   );
+  console.log("🧪 [MultiAgent] Running initial test evaluation...");
   const testResults = await evaluateTestCases(testCases, currentUiVersion);
   const passedCount = testResults.filter((r) => r.status === "passed").length;
+  console.log("📊 [MultiAgent] Initial test results:", {
+    passed: passedCount,
+    total: testResults.length,
+    passRate: `${Math.round((passedCount / testResults.length) * 100)}%`,
+  });
   updateTimeline(
     testRunId,
     "test-execution",
@@ -664,6 +674,7 @@ function getRunStatusInternal(testRunId: string): {
   currentIterationIndex: number;
   maxIterations: number;
   timeline: TimelineEvent[];
+  componentId?: string;
 } {
   const testRun = testRunsStore.get(testRunId);
   const timeline = timelinesStore.get(testRunId) || [];
@@ -682,6 +693,7 @@ function getRunStatusInternal(testRunId: string): {
     currentIterationIndex: testRun.currentIterationIndex,
     maxIterations: testRun.maxIterations,
     timeline,
+    componentId: testRun.componentId,
   };
 }
 
@@ -729,14 +741,44 @@ export const multiAgentRouter = createTRPCRouter({
         requirementText: z.string(),
         componentId: z.string().optional(),
         isRegressionTest: z.boolean().optional(),
+        media: z
+          .array(
+            z.object({
+              id: z.string(),
+              type: z.enum([
+                "image",
+                "audio",
+                "code",
+                "element",
+                "action",
+                "action-sequence",
+                "logic",
+              ]),
+              url: z.string(),
+              name: z.string(),
+              size: z.number().optional(),
+              actions: z.any().optional(),
+              logicId: z.string().optional(),
+              logicContent: z.string().optional(),
+              elementName: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const testRunId = `run_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 9)}`;
       const requirementId = `req_${Date.now()}`;
       const initialUiVersionId = `ui_${Date.now()}_0`;
+
+      console.log("🚀 [MultiAgent] Test run started:", {
+        testRunId,
+        componentId: input.componentId,
+        isRegressionTest: input.isRegressionTest,
+        hasMedia: !!input.media?.length,
+      });
 
       try {
         // Phase 1: Requirement parsing
@@ -746,10 +788,15 @@ export const multiAgentRouter = createTRPCRouter({
           "Requirement Parser",
           "Analyzing user requirement...",
         );
+        console.log("📋 [MultiAgent] Parsing requirement...");
         const requirement = await parseRequirement(
           input.requirementText,
           requirementId,
         );
+        console.log("✅ [MultiAgent] Requirement parsed:", {
+          goals: requirement.parsedGoals.length,
+          actions: requirement.keyActions.length,
+        });
         updateTimeline(
           testRunId,
           "requirement-parsing",
@@ -761,29 +808,58 @@ export const multiAgentRouter = createTRPCRouter({
         let uiVersion: UiVersion;
 
         // Phase 2a: Load existing UI (US4 Regression) OR Generate new UI (US1-2)
-        if (input.componentId && input.isRegressionTest) {
-          // T033: Load existing component for regression testing
+        if (input.componentId) {
+          // T033: Load existing component for regression/testing
           updateTimeline(
             testRunId,
             "ui-generation",
             "UI Loader",
             "Loading existing UI...",
           );
-          uiVersion = {
-            id: initialUiVersionId,
-            componentId: input.componentId,
-            versionIndex: 0,
-            files: [], // In production, load from DB
-            createdAt: new Date().toISOString(),
-            createdBy: "generator",
-          };
-          updateTimeline(
-            testRunId,
-            "ui-generation",
-            "UI Loader",
-            "Existing UI loaded for regression testing",
-            true,
-          );
+
+          try {
+            const component = await ctx.db.component.findUnique({
+              where: { id: input.componentId },
+              include: { revisions: true },
+            });
+
+            if (!component) {
+              throw new Error(`Component ${input.componentId} not found`);
+            }
+
+            // Get the latest revision's code
+            const latestRevision =
+              component.revisions[component.revisions.length - 1];
+            const files = latestRevision
+              ? parseCodeToComponentFiles(latestRevision.code)
+              : parseCodeToComponentFiles(component.code);
+
+            uiVersion = {
+              id: initialUiVersionId,
+              componentId: input.componentId,
+              versionIndex: 0,
+              files,
+              createdAt: new Date().toISOString(),
+              createdBy: "generator",
+            };
+
+            updateTimeline(
+              testRunId,
+              "ui-generation",
+              "UI Loader",
+              `Loaded existing UI with ${files.length} files${
+                input.isRegressionTest ? " for regression testing" : ""
+              }`,
+              true,
+            );
+          } catch (error) {
+            console.error("Error loading component:", error);
+            throw new Error(
+              `Failed to load component: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            );
+          }
         } else {
           // Phase 2b: Generate new UI (US1-2)
           updateTimeline(
@@ -795,6 +871,7 @@ export const multiAgentRouter = createTRPCRouter({
           uiVersion = await generateInitialUi(
             input.requirementText,
             initialUiVersionId,
+            input.media,
           );
           updateTimeline(
             testRunId,
@@ -812,18 +889,21 @@ export const multiAgentRouter = createTRPCRouter({
           "Test Planner",
           "Generating test cases...",
         );
+        console.log("📝 [MultiAgent] Generating test cases...");
         const testCases = await generateTestCases(
           requirement,
           uiVersion,
           testRunId,
         );
+        console.log("✅ [MultiAgent] Test cases generated:", testCases.length);
 
         // T034: Tag test cases for regression scenarios
         if (input.isRegressionTest) {
           // Mark first 50% as old, rest as new
           const newCutoff = Math.ceil(testCases.length / 2);
           testCases.forEach((tc, idx) => {
-            (tc as Record<string, unknown>).isNewCase = idx >= newCutoff;
+            (tc as unknown as Record<string, unknown>).isNewCase =
+              idx >= newCutoff;
           });
         }
 
@@ -838,12 +918,17 @@ export const multiAgentRouter = createTRPCRouter({
         );
 
         // Phase 4-5: Iterative Testing and Optimization (T023-T024) (US2)
+        console.log("🔄 [MultiAgent] Starting iterative testing loop...");
         const { iterations, finalStatus } = await runIterativeTestingLoop(
           testRunId,
           requirement,
           uiVersion,
           testCases,
         );
+        console.log("✅ [MultiAgent] Testing loop completed:", {
+          iterations: iterations.length,
+          status: finalStatus,
+        });
 
         // Phase 6: Report Generation (T015)
         updateTimeline(
@@ -852,8 +937,16 @@ export const multiAgentRouter = createTRPCRouter({
           "Reporter",
           "Generating test report...",
         );
+        console.log("📊 [MultiAgent] Generating test report...");
         const report = generateTestReport(testRunId, iterations);
         testReportsStore.set(testRunId, report);
+        console.log("✅ [MultiAgent] Report stored:", {
+          testRunId,
+          reportId: report.id,
+          totalCases: report.stats.totalCases,
+          passed: report.stats.passed,
+          failed: report.stats.failed,
+        });
         updateTimeline(
           testRunId,
           "report-generation",
@@ -873,9 +966,15 @@ export const multiAgentRouter = createTRPCRouter({
           maxIterations: 3,
           testCases,
           iterations,
+          componentId: uiVersion.componentId,
         };
 
         testRunsStore.set(testRunId, testRun);
+        console.log("✅ [MultiAgent] Test run completed successfully:", {
+          testRunId,
+          componentId: uiVersion.componentId,
+          status: finalStatus,
+        });
 
         return {
           testRunId,
@@ -883,7 +982,11 @@ export const multiAgentRouter = createTRPCRouter({
           requirementId,
         };
       } catch (error) {
-        console.error("Error in startRun:", error);
+        console.error("❌ [MultiAgent] Error in startRun:", error);
+        console.error(
+          "Stack trace:",
+          error instanceof Error ? error.stack : error,
+        );
         throw error;
       }
     }),
@@ -898,7 +1001,10 @@ export const multiAgentRouter = createTRPCRouter({
       }),
     )
     .query(({ input }) => {
-      return getRunStatusInternal(input.testRunId);
+      console.log("📡 [MultiAgent] Getting run status for:", input.testRunId);
+      const status = getRunStatusInternal(input.testRunId);
+      console.log("📊 [MultiAgent] Current status:", status.status);
+      return status;
     }),
 
   /**
@@ -911,10 +1017,17 @@ export const multiAgentRouter = createTRPCRouter({
       }),
     )
     .query(({ input }) => {
+      console.log("📊 [MultiAgent] Getting report for:", input.testRunId);
+      console.log(
+        "📦 [MultiAgent] Reports in store:",
+        Array.from(testReportsStore.keys()),
+      );
       const report = testReportsStore.get(input.testRunId);
       if (!report) {
+        console.error("❌ [MultiAgent] Report not found:", input.testRunId);
         throw new Error(`Report not found for testRunId: ${input.testRunId}`);
       }
+      console.log("✅ [MultiAgent] Report found:", report.id);
       return report;
     }),
 });
