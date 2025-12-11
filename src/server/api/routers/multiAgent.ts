@@ -7,6 +7,7 @@ import type { ComponentFile } from "~/utils/compiler";
 import { generateText } from "ai";
 import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 import type { MediaItem } from "~/types/multimodal";
+import { executeMcpTest } from "./mcp";
 
 // ============================================================================
 // Data Types (from data-model.md)
@@ -532,8 +533,7 @@ async function runIterativeTestingLoop(
 }
 
 /**
- * T013: Evaluator - Execute test cases against UI using mock results for now
- * In production, this would call MCP server for browser automation
+ * T013: Evaluator - Execute test cases against UI using MCP server
  */
 async function evaluateTestCases(
   testCases: TestCase[],
@@ -541,32 +541,95 @@ async function evaluateTestCases(
 ): Promise<TestCaseResult[]> {
   const results: TestCaseResult[] = [];
 
+  // Get MCP server URL from environment
+  const mcpServerUrl =
+    process.env.MCP_SERVER_URL || "http://localhost:8000/mcp";
+
+  console.log(
+    "🧪 [MultiAgent] Evaluating",
+    testCases.length,
+    "test cases using MCP server:",
+    mcpServerUrl,
+  );
+
   for (const tc of testCases) {
-    // Mock evaluation: randomly pass/fail for demonstration
-    // In real implementation, this would call MCP server
-    const passed = Math.random() > 0;
+    console.log(`📝 [MultiAgent] Executing test case: ${tc.title}`);
 
-    const stepResults: TestStepResult[] = tc.steps.map((step, idx) => ({
-      stepId: step.id,
-      status: passed
-        ? "passed"
-        : idx === tc.steps.length - 1
-        ? "failed"
-        : "passed",
-      message: passed
-        ? "Step executed successfully"
-        : "Step failed or element not found",
-    }));
+    try {
+      // Build test description and steps
+      const testDescription = `Test: ${tc.title}\n${tc.description}\nExpected Result: ${tc.expectedResult}`;
+      const testSteps = tc.steps.map((step) => {
+        let stepDesc = step.description;
+        if (step.action) {
+          stepDesc += ` (${step.action}`;
+          if (step.targetSelector) stepDesc += ` on ${step.targetSelector}`;
+          if (step.inputValue) stepDesc += ` with value "${step.inputValue}"`;
+          stepDesc += ")";
+        }
+        if (step.expectedOutcome) {
+          stepDesc += ` - Expected: ${step.expectedOutcome}`;
+        }
+        return stepDesc;
+      });
 
-    results.push({
-      testCaseId: tc.id,
-      status: passed ? "passed" : "failed",
-      stepResults,
-      failureReason: passed
-        ? undefined
-        : "UI element not responsive or incorrect behavior",
-      relatedUiVersionId: uiVersion.id,
-    });
+      // Execute test using MCP
+      const testResult = await executeMcpTest({
+        testDescription,
+        testSteps,
+        mcpServerUrl,
+        maxIterations: 15,
+      });
+
+      console.log(
+        `📊 [MultiAgent] Test case "${tc.title}" result:`,
+        testResult,
+      );
+
+      // Map MCP result to TestCaseResult
+      const stepResults: TestStepResult[] = tc.steps.map((step, idx) => ({
+        stepId: step.id,
+        status: testResult.success
+          ? "passed"
+          : idx === tc.steps.length - 1
+          ? "failed"
+          : "passed",
+        message: testResult.success
+          ? "Step executed successfully"
+          : testResult.error || "Step execution failed",
+      }));
+
+      results.push({
+        testCaseId: tc.id,
+        status: testResult.success ? "passed" : "failed",
+        stepResults,
+        failureReason: testResult.success
+          ? undefined
+          : testResult.error || "Test execution failed",
+        relatedUiVersionId: uiVersion.id,
+      });
+    } catch (error) {
+      console.error(
+        `❌ [MultiAgent] Error executing test case "${tc.title}":`,
+        error,
+      );
+
+      // Mark as failed if there's an execution error
+      const stepResults: TestStepResult[] = tc.steps.map((step) => ({
+        stepId: step.id,
+        status: "failed",
+        message:
+          error instanceof Error ? error.message : "Test execution error",
+      }));
+
+      results.push({
+        testCaseId: tc.id,
+        status: "failed",
+        stepResults,
+        failureReason:
+          error instanceof Error ? error.message : "Test execution error",
+        relatedUiVersionId: uiVersion.id,
+      });
+    }
   }
 
   return results;
