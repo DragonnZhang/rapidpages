@@ -19,24 +19,24 @@
 
 **Purpose**: 为多智能体闭环准备最小的工程地基，确保可以在当前分支上安全开发和运行。
 
-- [ ] T001 在 `specs/002-multi-agent-ui-loop/` 目录审阅 `spec.md`、`plan.md`、`data-model.md`、`contracts/` 和 `quickstart.md`，确认需求与设计已对齐
-- [ ] T002 [P] 在 `src/server/api/root.ts` 中确认现有 tRPC 结构，并预留/标注 `multiAgent` 路由挂载位置
-- [ ] T003 [P] 在 `src/server/api/routers/` 下创建占位文件 `multiAgent.ts`（仅导出空 router），确保编译通过
+- [X] T001 在 `specs/002-multi-agent-ui-loop/` 目录审阅 `spec.md`、`plan.md`、`data-model.md`、`contracts/` 和 `quickstart.md`，确认需求与设计已对齐
+- [X] T002 [P] 在 `src/server/api/root.ts` 中确认现有 tRPC 结构，并预留/标注 `multiAgent` 路由挂载位置
+- [X] T003 [P] 在 `src/server/api/routers/` 下创建占位文件 `multiAgent.ts`（仅导出空 router），确保编译通过
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: 建立多智能体 orchestrator 的基础骨架与数据结构，在此之前不得开始任何具体用户故事实现。
+**Purpose**: 建立多智能体 orchestrator 的基础骨架与数据结构,在此之前不得开始任何具体用户故事实现。
 
-**⚠️ CRITICAL**: 未完成本阶段前，不得开始任何 US1–US4 的实现。
+**⚠️ CRITICAL**: 未完成本阶段前,不得开始任何 US1–US4 的实现。
 
-- [ ] T004 在 `src/server/api/routers/multiAgent.ts` 中定义基础 tRPC router 结构（`createTRPCRouter` 调用），预留 `startRun`、`getRunStatus`、`getReport` 三个 procedure 名称
-- [ ] T005 在 `src/server/api/root.ts` 中注册 `multiAgent` router，并在 `src/utils/api.ts` 中导出 `api.multiAgent` 客户端类型
-- [ ] T006 [P] 在 `src/server/api/routers/multiAgent.ts` 中引入 `env`、`getModelByName`、`generateNewComponent`、`reviseComponent`、`mcpRouter` 或 MCP 客户端所需类型，以便后续编排使用
-- [ ] T007 [P] 在 `src/server/api/routers/multiAgent.ts` 中按 `data-model.md` 定义 TypeScript 接口/类型（如 `UserRequirement`、`TestRun`、`TestCase`、`TestReport`），并与 `contracts/multi-agent-orchestrator-openapi.md` 对齐
-- [ ] T008 在 `src/server/api/routers/multiAgent.ts` 中实现基础的内存存储结构（如 Map 或简单对象）用于保存 `TestRun` 与 `TestReport`，为后续各用户故事共享
-- [ ] T009 在 `src/pages/` 下创建新的入口页面文件（如 `multi-agent.tsx`），包含基本布局与通过 `api.multiAgent.startRun` 触发闭环的按钮占位
+- [X] T004 在 `src/server/api/routers/multiAgent.ts` 中定义基础 tRPC router 结构（`createTRPCRouter` 调用），预留 `startRun`、`getRunStatus`、`getReport` 三个 procedure 名称
+- [X] T005 在 `src/server/api/root.ts` 中注册 `multiAgent` router，并在 `src/utils/api.ts` 中导出 `api.multiAgent` 客户端类型
+- [X] T006 [P] 在 `src/server/api/routers/multiAgent.ts` 中引入 `env`、`getModelByName`、`generateNewComponent`、`reviseComponent`、`mcpRouter` 或 MCP 客户端所需类型，以便后续编排使用
+- [X] T007 [P] 在 `src/server/api/routers/multiAgent.ts` 中按 `data-model.md` 定义 TypeScript 接口/类型（如 `UserRequirement`、`TestRun`、`TestCase`、`TestReport`），并与 `contracts/multi-agent-orchestrator-openapi.md` 对齐
+- [X] T008 在 `src/server/api/routers/multiAgent.ts` 中实现基础的内存存储结构（如 Map 或简单对象）用于保存 `TestRun` 与 `TestReport`，为后续各用户故事共享
+- [X] T009 在 `src/pages/` 下创建新的入口页面文件（如 `multi-agent.tsx`），包含基本布局与通过 `api.multiAgent.startRun` 触发闭环的按钮占位
 
 **Checkpoint**: 多智能体 orchestrator 的路由和数据类型就绪，前端页面可以成功调用 `startRun` 并获得占位响应。
 
@@ -50,16 +50,16 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] 在 `src/server/api/routers/multiAgent.ts` 的 `startRun` 中实现 `UserRequirement` 创建与初始 `TestRun` 实例化逻辑（生成 `testRunId`、`initialUiVersionId` 占位）
-- [ ] T011 [US1] 在 `src/server/api/routers/multiAgent.ts` 中集成 `generateNewComponent`：根据 `requirementText` 生成初始 `UiVersion`（只需返回 `ComponentFile[]` 与 `uiVersionId`，存入内存）
-- [ ] T012 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现“测试用例生成 Agent”函数：基于 `UserRequirement` 和 `UiVersion`，调用 LLM 生成若干 `TestCase`（按 `data-model.md` 结构），暂存到对应 `TestRun`
-- [ ] T013 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 Evaluator 基础流程：串行遍历 `TestCase[]`，为每条用例构建对 MCP 的任务提示，并调用现有 `mcpRouter.agentLoop` 或 MCP 客户端完成 UI 操作
-- [ ] T014 [US1] 在 Evaluator 中根据 MCP 返回结果填充 `TestCaseResult` 与 `IterationCycle`（第 0 轮，仅初始 UI），并统计通过/失败用例
-- [ ] T015 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现简单的 `TestReport` 生成逻辑：基于一次执行结果构建 `summary` 与 `stats`，存入内存结构
-- [ ] T016 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getRunStatus`，返回当前 `TestRun` 的 `status`、`currentIterationIndex` 与基础 `timeline` 信息（至少包含 `requirement-parsing`、`ui-generation`、`testcase-generation`、`test-execution`、`report-generation` 阶段）
-- [ ] T017 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getReport`，返回完整的 `TestReport`
-- [ ] T018 [P] [US1] 在 `src/pages/multi-agent.tsx` 中实现“需求输入 + 启动按钮 + 运行状态展示”UI，使用 `api.multiAgent.startRun` 和 `api.multiAgent.getRunStatus` 轮询或刷新界面
-- [ ] T019 [P] [US1] 在 `src/pages/multi-agent.tsx` 或新建组件（如 `src/components/MultiAgentRunTimeline.tsx`）中使用 `timeline` 渲染基础阶段列表，并在完成后展示 `getReport` 返回的统计信息
+- [X] T010 [US1] 在 `src/server/api/routers/multiAgent.ts` 的 `startRun` 中实现 `UserRequirement` 创建与初始 `TestRun` 实例化逻辑（生成 `testRunId`、`initialUiVersionId` 占位）
+- [X] T011 [US1] 在 `src/server/api/routers/multiAgent.ts` 中集成 `generateNewComponent`：根据 `requirementText` 生成初始 `UiVersion`（只需返回 `ComponentFile[]` 与 `uiVersionId`，存入内存）
+- [X] T012 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现“测试用例生成 Agent”函数：基于 `UserRequirement` 和 `UiVersion`，调用 LLM 生成若干 `TestCase`（按 `data-model.md` 结构），暂存到对应 `TestRun`
+- [X] T013 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 Evaluator 基础流程：串行遍历 `TestCase[]`，为每条用例构建对 MCP 的任务提示，并调用现有 `mcpRouter.agentLoop` 或 MCP 客户端完成 UI 操作
+- [X] T014 [US1] 在 Evaluator 中根据 MCP 返回结果填充 `TestCaseResult` 与 `IterationCycle`（第 0 轮，仅初始 UI），并统计通过/失败用例
+- [X] T015 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现简单的 `TestReport` 生成逻辑：基于一次执行结果构建 `summary` 与 `stats`，存入内存结构
+- [X] T016 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getRunStatus`，返回当前 `TestRun` 的 `status`、`currentIterationIndex` 与基础 `timeline` 信息（至少包含 `requirement-parsing`、`ui-generation`、`testcase-generation`、`test-execution`、`report-generation` 阶段）
+- [X] T017 [US1] 在 `src/server/api/routers/multiAgent.ts` 中实现 `getReport`，返回完整的 `TestReport`
+- [X] T018 [P] [US1] 在 `src/pages/multi-agent.tsx` 中实现“需求输入 + 启动按钮 + 运行状态展示”UI，使用 `api.multiAgent.startRun` 和 `api.multiAgent.getRunStatus` 轮询或刷新界面
+- [X] T019 [P] [US1] 在 `src/pages/multi-agent.tsx` 或新建组件（如 `src/components/MultiAgentRunTimeline.tsx`）中使用 `timeline` 渲染基础阶段列表，并在完成后展示 `getReport` 返回的统计信息
 
 **Checkpoint**: 用户可以在 `multi-agent` 页面输入需求并获得一次完整（单轮）的 UI 生成+测试+报告闭环，尚未包含失败驱动迭代逻辑。
 
@@ -73,14 +73,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] 在 `src/server/api/routers/multiAgent.ts` 中扩展 Evaluator，将失败的 `TestCaseResult`（包含步骤与 MCP 错误信息）打包为 Optimizer 的输入结构
-- [ ] T021 [US2] 在 `src/server/api/routers/multiAgent.ts` 中集成 `reviseComponent`：基于失败用例上下文和当前 `UiVersion.files` 调用 UI 修改 Agent，生成新的 `ComponentFile[]` 并创建后续 `UiVersion`
-- [ ] T022 [US2] 在 `src/server/api/routers/multiAgent.ts` 中维护 `IterationCycle[]`：为每次“失败→修改→重测”增加一条迭代记录，并标记 `triggeredByTestCaseId`
-- [ ] T023 [US2] 在 Evaluator 中实现按 FR-011 控制的最多 3 轮迭代逻辑：每轮结束后检查整体状态，若仍有关键用例失败且迭代次数未达上限则继续，否则停止并更新 `TestRun.status`
-- [ ] T024 [US2] 在回归测试阶段只重跑相关用例：根据触发失败的 `TestCaseId` 及其依赖关系选择需要重新执行的测试集，避免全量重跑
-- [ ] T025 [US2] 在 `TestReport` 结构填充每轮迭代的 `changesSummary` 字段（可由 Optimizer 返回的说明文本生成），便于用户理解每次修改内容
-- [ ] T026 [P] [US2] 在前端 `multi-agent.tsx` 或 `MultiAgentRunTimeline` 组件中可视化显示各迭代轮次（0~N），包括 UI 版本索引与触发它的失败用例摘要
-- [ ] T027 [US2] 在前端报告展示中增加“自动修复历史”区域，列出每轮修复尝试及结果（成功/仍失败/达到上限）
+- [X] T020 [US2] 在 `src/server/api/routers/multiAgent.ts` 中扩展 Evaluator，将失败的 `TestCaseResult`（包含步骤与 MCP 错误信息）打包为 Optimizer 的输入结构
+- [X] T021 [US2] 在 `src/server/api/routers/multiAgent.ts` 中集成 `reviseComponent`：基于失败用例上下文和当前 `UiVersion.files` 调用 UI 修改 Agent，生成新的 `ComponentFile[]` 并创建后续 `UiVersion`
+- [X] T022 [US2] 在 `src/server/api/routers/multiAgent.ts` 中维护 `IterationCycle[]`：为每次“失败→修改→重测”增加一条迭代记录，并标记 `triggeredByTestCaseId`
+- [X] T023 [US2] 在 Evaluator 中实现按 FR-011 控制的最多 3 轮迭代逻辑：每轮结束后检查整体状态，若仍有关键用例失败且迭代次数未达上限则继续，否则停止并更新 `TestRun.status`
+- [X] T024 [US2] 在回归测试阶段只重跑相关用例：根据触发失败的 `TestCaseId` 及其依赖关系选择需要重新执行的测试集，避免全量重跑
+- [X] T025 [US2] 在 `TestReport` 结构填充每轮迭代的 `changesSummary` 字段（可由 Optimizer 返回的说明文本生成），便于用户理解每次修改内容
+- [X] T026 [P] [US2] 在前端 `multi-agent.tsx` 或 `MultiAgentRunTimeline` 组件中可视化显示各迭代轮次（0~N），包括 UI 版本索引与触发它的失败用例摘要
+- [X] T027 [US2] 在前端报告展示中增加“自动修复历史”区域，列出每轮修复尝试及结果（成功/仍失败/达到上限）
 
 **Checkpoint**: 对单个或少量失败用例，系统能够自动驱动 UI 迭代并重测，在 3 轮内收敛或给出人工介入提示。
 
@@ -94,11 +94,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] 在 `src/server/api/routers/multiAgent.ts` 中完善 `timeline` 结构，为每个阶段填充 `startedAt`、`finishedAt` 和 `summary`，涵盖规范中的各阶段（需求解析、UI 生成、测试用例设计、测试执行、结果分析、UI 迭代、报告生成）
-- [ ] T029 [P] [US3] 在 `src/components/` 下创建 `MultiAgentRunTimeline.tsx`，以时间线或分组列表形式渲染 `timeline`，支持按阶段展开/折叠摘要
-- [ ] T030 [P] [US3] 在 `src/pages/multi-agent.tsx` 中集成 `MultiAgentRunTimeline` 组件，并根据 `getRunStatus` 返回的数据实时更新阶段状态
-- [ ] T031 [US3] 在前端为每个阶段标注对应的 Agent 名称（UI Generator、Testcase Planner、Evaluator、Optimizer、Reporter），并使用不同颜色或图标区分
-- [ ] T032 [US3] 在报告视图中加入“过程回放”入口，允许用户在闭环完成后重新查看整个阶段序列及关键统计指标
+- [X] T028 [US3] 在 `src/server/api/routers/multiAgent.ts` 中完善 `timeline` 结构，为每个阶段填充 `startedAt`、`finishedAt` 和 `summary`，涵盖规范中的各阶段（需求解析、UI 生成、测试用例设计、测试执行、结果分析、UI 迭代、报告生成）
+- [X] T029 [P] [US3] 在 `src/components/` 下创建 `MultiAgentRunTimeline.tsx`，以时间线或分组列表形式渲染 `timeline`，支持按阶段展开/折叠摘要
+- [X] T030 [P] [US3] 在 `src/pages/multi-agent.tsx` 中集成 `MultiAgentRunTimeline` 组件，并根据 `getRunStatus` 返回的数据实时更新阶段状态
+- [X] T031 [US3] 在前端为每个阶段标注对应的 Agent 名称（UI Generator、Testcase Planner、Evaluator、Optimizer、Reporter），并使用不同颜色或图标区分
+- [X] T032 [US3] 在报告视图中加入“过程回放”入口，允许用户在闭环完成后重新查看整个阶段序列及关键统计指标
 
 **Checkpoint**: 用户能够通过可视化时间线理解多智能体的协作过程，并在必要时对单次运行进行复盘。
 
@@ -112,11 +112,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] 在 `multiAgent.startRun` 的输入中支持 `componentId`，并在存在该字段时跳过初始 UI 生成逻辑，转而从数据库加载现有 `Component`/`ComponentRevision` 形成初始 `UiVersion`
-- [ ] T034 [US4] 在“测试用例生成 Agent”中区分“原有用例”和“新增用例”（例如通过 tag 或命名约定），并在 `TestCase` 中记录分类信息
-- [ ] T035 [US4] 在 Evaluator 与 Optimizer 逻辑中优先处理新增用例失败场景，尽量将 UI 修改范围局限在与新增需求相关的部分（可通过在 prompt 中加入限制说明实现）
-- [ ] T036 [US4] 在 `TestReport` 中增加对“原有用例 vs 新增用例”执行结果的分组统计，帮助用户快速识别变更影响
-- [ ] T037 [P] [US4] 在前端 `multi-agent.tsx` 页面增加从“我的 UI”或现有组件列表中选择 `componentId` 的入口，并在界面上区分“新建场景”和“基于已有 UI 的回归/扩展场景”
+- [X] T033 [US4] 在 `multiAgent.startRun` 的输入中支持 `componentId`，并在存在该字段时跳过初始 UI 生成逻辑，转而从数据库加载现有 `Component`/`ComponentRevision` 形成初始 `UiVersion`
+- [X] T034 [US4] 在“测试用例生成 Agent”中区分“原有用例”和“新增用例”（例如通过 tag 或命名约定），并在 `TestCase` 中记录分类信息
+- [X] T035 [US4] 在 Evaluator 与 Optimizer 逻辑中优先处理新增用例失败场景，尽量将 UI 修改范围局限在与新增需求相关的部分（可通过在 prompt 中加入限制说明实现）
+- [X] T036 [US4] 在 `TestReport` 中增加对“原有用例 vs 新增用例”执行结果的分组统计，帮助用户快速识别变更影响
+- [X] T037 [P] [US4] 在前端 `multi-agent.tsx` 页面增加从“我的 UI”或现有组件列表中选择 `componentId` 的入口，并在界面上区分“新建场景”和“基于已有 UI 的回归/扩展场景”
 
 **Checkpoint**: 系统可以在已有 UI 上完成基于新增需求的补充测试与局部迭代，而不会破坏原有核心结构。
 
@@ -126,12 +126,12 @@
 
 **Purpose**: 跨用户故事的统一打磨与优化。
 
-- [ ] T038 [P] 在 `specs/002-multi-agent-ui-loop/quickstart.md` 中更新示例代码与说明，使其与最终实现的 API 和 UI 行为保持一致
-- [ ] T039 [P] 在 `README.md` 或新增文档中增加“多智能体 UI 测试闭环”简介与入口说明，指向 `multi-agent` 页面
-- [ ] T040 在 `src/server/openai.ts` 与 `src/server/api/routers/mcp.ts` 中检查与 orchestrator 的集成点，移除不再使用的调试日志或临时代码
-- [ ] T041 对 `src/pages/multi-agent.tsx` 和新建组件进行样式和交互细节打磨（如加载态、错误提示、滚动/布局优化），使用 Tailwind 保持与现有 UI 风格一致
-- [ ] T042 [P] 运行 `npm run lint` 并修复与本特性相关的所有 lint 问题
-- [ ] T043 检查在多轮迭代中 LLM 调用与 MCP 调用的失败场景，补充必要的错误处理和用户可见提示
+- [X] T038 [P] 在 `specs/002-multi-agent-ui-loop/quickstart.md` 中更新示例代码与说明，使其与最终实现的 API 和 UI 行为保持一致
+- [X] T039 [P] 在 `README.md` 或新增文档中增加“多智能体 UI 测试闭环”简介与入口说明，指向 `multi-agent` 页面
+- [X] T040 在 `src/server/openai.ts` 与 `src/server/api/routers/mcp.ts` 中检查与 orchestrator 的集成点，移除不再使用的调试日志或临时代码
+- [X] T041 对 `src/pages/multi-agent.tsx` 和新建组件进行样式和交互细节打磨（如加载态、错误提示、滚动/布局优化），使用 Tailwind 保持与现有 UI 风格一致
+- [X] T042 [P] 运行 `npm run lint` 并修复与本特性相关的所有 lint 问题
+- [X] T043 检查在多轮迭代中 LLM 调用与 MCP 调用的失败场景，补充必要的错误处理和用户可见提示
 
 ---
 
