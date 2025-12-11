@@ -323,6 +323,15 @@ ${uiDescription}`,
     expectedResult: (tc.expectedResult as string) || "",
   }));
 
+  console.log(
+    "📝 [MultiAgent] Test cases with categories:",
+    testCases.map((tc) => ({
+      id: tc.id,
+      title: tc.title,
+      category: tc.category,
+    })),
+  );
+
   return testCases;
 }
 
@@ -584,37 +593,44 @@ function buildIterationCycle(
 function generateTestReport(
   testRunId: string,
   iterations: IterationCycle[],
+  testCases: TestCase[],
 ): TestReport {
   // Aggregate results from all iterations
   const allResults = iterations.flatMap((it) => it.testCaseResults);
   const passedResults = allResults.filter((r) => r.status === "passed");
   const failedResults = allResults.filter((r) => r.status === "failed");
 
-  // Calculate coverage by category (simplified)
-  const coreFlowCases = allResults.filter(
-    (r) =>
-      testRunsStore
-        .get(testRunId)
-        ?.testCases.find(
-          (tc) => tc.id === r.testCaseId && tc.category === "core-flow",
-        ),
-  );
-  const usabilityCases = allResults.filter(
-    (r) =>
-      testRunsStore
-        .get(testRunId)
-        ?.testCases.find(
-          (tc) => tc.id === r.testCaseId && tc.category === "usability",
-        ),
-  );
-  const edgeCases = allResults.filter(
-    (r) =>
-      testRunsStore
-        .get(testRunId)
-        ?.testCases.find(
-          (tc) => tc.id === r.testCaseId && tc.category === "edge",
-        ),
-  );
+  console.log("📊 [MultiAgent] Generating report with test cases:", {
+    totalResults: allResults.length,
+    totalTestCases: testCases.length,
+    categories: {
+      coreFlow: testCases.filter((tc) => tc.category === "core-flow").length,
+      usability: testCases.filter((tc) => tc.category === "usability").length,
+      edge: testCases.filter((tc) => tc.category === "edge").length,
+    },
+  });
+
+  // Calculate coverage by category - match results with test case categories
+  const coreFlowCases = allResults.filter((r) => {
+    const testCase = testCases.find((tc) => tc.id === r.testCaseId);
+    return testCase && testCase.category === "core-flow";
+  });
+
+  const usabilityCases = allResults.filter((r) => {
+    const testCase = testCases.find((tc) => tc.id === r.testCaseId);
+    return testCase && testCase.category === "usability";
+  });
+
+  const edgeCases = allResults.filter((r) => {
+    const testCase = testCases.find((tc) => tc.id === r.testCaseId);
+    return testCase && testCase.category === "edge";
+  });
+
+  console.log("📊 [MultiAgent] Coverage calculation:", {
+    coreFlowCases: coreFlowCases.length,
+    usabilityCases: usabilityCases.length,
+    edgeCases: edgeCases.length,
+  });
 
   const report: TestReport = {
     id: `report_${testRunId}`,
@@ -895,7 +911,8 @@ export const multiAgentRouter = createTRPCRouter({
           uiVersion,
           testRunId,
         );
-        console.log("✅ [MultiAgent] Test cases generated:", testCases.length);
+
+        console.log("✅ [MultiAgent] Test cases generated:", testCases);
 
         // T034: Tag test cases for regression scenarios
         if (input.isRegressionTest) {
@@ -938,7 +955,7 @@ export const multiAgentRouter = createTRPCRouter({
           "Generating test report...",
         );
         console.log("📊 [MultiAgent] Generating test report...");
-        const report = generateTestReport(testRunId, iterations);
+        const report = generateTestReport(testRunId, iterations, testCases);
         testReportsStore.set(testRunId, report);
         console.log("✅ [MultiAgent] Report stored:", {
           testRunId,
@@ -946,6 +963,11 @@ export const multiAgentRouter = createTRPCRouter({
           totalCases: report.stats.totalCases,
           passed: report.stats.passed,
           failed: report.stats.failed,
+          coverage: {
+            coreFlow: report.stats.coreFlowCoverage,
+            usability: report.stats.usabilityCoverage,
+            edge: report.stats.edgeCoverage,
+          },
         });
         updateTimeline(
           testRunId,
