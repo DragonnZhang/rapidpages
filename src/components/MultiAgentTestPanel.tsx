@@ -3,6 +3,7 @@ import { api } from "~/utils/api";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
 import { MultiAgentRunTimeline } from "./MultiAgentRunTimeline";
+import { TestCasesPanel } from "./TestCasesPanel";
 import type { TestReport } from "~/server/api/routers/multiAgent";
 import { useRouter } from "next/router";
 
@@ -17,7 +18,6 @@ export const MultiAgentTestPanel = ({
   componentName,
   autoStart = false,
 }: MultiAgentTestPanelProps) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [testReport, setTestReport] = useState<TestReport | null>(null);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
@@ -48,6 +48,40 @@ export const MultiAgentTestPanel = ({
         retryDelay: 1000,
       },
     );
+
+  const { data: testCases } = api.multiAgent.getTestCases.useQuery(
+    { testRunId: testRunId! },
+    {
+      enabled: !!testRunId,
+      refetchInterval: (data) => {
+        if (!data) return false;
+        // Refetch while there are pending or running tests
+        const hasActiveTests = data.some(
+          (tc) => tc.status === "pending" || tc.status === "running",
+        );
+        return hasActiveTests ? 1000 : false;
+      },
+    },
+  );
+
+  useEffect(() => {
+    if (testCases) {
+      console.log(
+        "📋 [Frontend] Test cases loaded:",
+        testCases.length,
+        testCases,
+      );
+    }
+  }, [testCases]);
+
+  useEffect(() => {
+    console.log(
+      "🎯 [Frontend] Current testRunId:",
+      testRunId,
+      "- Panel visible:",
+      !!testRunId,
+    );
+  }, [testRunId]);
 
   useEffect(() => {
     if (reportData) {
@@ -125,7 +159,7 @@ export const MultiAgentTestPanel = ({
 
       setTestRunId(result.testRunId);
       setTestReport(null);
-      setIsOpen(true);
+      console.log("📄 [Frontend] testRunId set to:", result.testRunId);
     } catch (error) {
       console.error("❌ [Frontend] Failed to start test:", error);
       console.error(
@@ -138,7 +172,6 @@ export const MultiAgentTestPanel = ({
   const handleReset = () => {
     setTestRunId(null);
     setTestReport(null);
-    setIsOpen(false);
   };
 
   return (
@@ -162,16 +195,6 @@ export const MultiAgentTestPanel = ({
           )}
         </Button>
 
-        {testRunId && (
-          <Button
-            onClick={() => setIsOpen(!isOpen)}
-            variant="secondary"
-            className="text-sm"
-          >
-            {isOpen ? "隐藏" : "显示"}测试详情
-          </Button>
-        )}
-
         {testRunId && runStatus?.status !== "running" && (
           <Button onClick={handleReset} variant="secondary" className="text-sm">
             重置
@@ -180,10 +203,12 @@ export const MultiAgentTestPanel = ({
       </div>
 
       {/* Collapsible Test Panel */}
-      {isOpen && testRunId && (
-        <div className="mt-4 rounded-lg border border-gray-300 bg-white p-4 shadow-sm">
+      {testRunId && (
+        <div className="mt-4 max-h-[600px] overflow-y-auto rounded-lg border-2 border-blue-500 bg-blue-50 p-4 shadow-lg">
           <div className="mb-4 flex items-center justify-between border-b pb-2">
-            <h3 className="text-lg font-semibold">测试执行详情</h3>
+            <h3 className="text-lg font-semibold text-blue-600">
+              ⚡ 测试执行详情 ⚡
+            </h3>
             <div className="flex items-center gap-2">
               {runStatus?.status === "running" && (
                 <span className="flex items-center gap-1 text-sm text-blue-600">
@@ -207,6 +232,32 @@ export const MultiAgentTestPanel = ({
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Test Cases Status */}
+          <div className="mb-6">
+            <h4 className="mb-3 text-sm font-semibold text-gray-700">
+              测试用例执行状态
+            </h4>
+            {!testCases ? (
+              <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
+                <Spinner className="mx-auto h-6 w-6" />
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  正在加载测试用例...
+                </p>
+              </div>
+            ) : testCases.length > 0 ? (
+              <TestCasesPanel
+                testCases={testCases}
+                isRunning={runStatus?.status === "running"}
+              />
+            ) : (
+              <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  暂无测试用例
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Timeline */}

@@ -159,6 +159,13 @@ const userRequirementsStore = new Map<string, UserRequirement>();
 const uiVersionsStore = new Map<string, UiVersion>();
 const timelinesStore = new Map<string, TimelineEvent[]>();
 
+// Store test cases and their execution status per test run
+const testCasesStore = new Map<string, TestCase[]>();
+const testCaseStatusStore = new Map<
+  string,
+  Map<string, { status: TestCaseStatus; error?: string; updatedAt: string }>
+>();
+
 // ============================================================================
 // Helper Functions for US1 Core Orchestration
 // ============================================================================
@@ -331,6 +338,33 @@ ${uiDescription}`,
       title: tc.title,
       category: tc.category,
     })),
+  );
+
+  // Store test cases for this test run
+  testCasesStore.set(testRunId, testCases);
+  console.log(
+    "💾 [MultiAgent] Stored test cases for run:",
+    testRunId,
+    "count:",
+    testCases.length,
+  );
+
+  // Initialize status for each test case
+  const statusMap = new Map<
+    string,
+    { status: TestCaseStatus; error?: string; updatedAt: string }
+  >();
+  testCases.forEach((tc) => {
+    statusMap.set(tc.id, {
+      status: "pending",
+      updatedAt: new Date().toISOString(),
+    });
+  });
+  testCaseStatusStore.set(testRunId, statusMap);
+  console.log(
+    "💾 [MultiAgent] Initialized status for",
+    statusMap.size,
+    "test cases",
   );
 
   return testCases;
@@ -600,6 +634,16 @@ async function evaluateTestCases(
   for (const tc of testCases) {
     console.log(`📝 [MultiAgent] Executing test case: ${tc.title}`);
 
+    // Update status to running
+    const testRunId = tc.requirementId; // Use requirementId as testRunId for now
+    const statusMap = testCaseStatusStore.get(testRunId);
+    if (statusMap) {
+      statusMap.set(tc.id, {
+        status: "running",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
     try {
       // Build test description and steps
       const testDescription = `Test: ${tc.title}\n${tc.description}\nExpected Result: ${tc.expectedResult}`;
@@ -643,15 +687,27 @@ async function evaluateTestCases(
           : testResult.error || "Step execution failed",
       }));
 
+      const finalStatus = testResult.success ? "passed" : "failed";
       results.push({
         testCaseId: tc.id,
-        status: testResult.success ? "passed" : "failed",
+        status: finalStatus,
         stepResults,
         failureReason: testResult.success
           ? undefined
           : testResult.error || "Test execution failed",
         relatedUiVersionId: uiVersion.id,
       });
+
+      // Update final status
+      if (statusMap) {
+        statusMap.set(tc.id, {
+          status: finalStatus,
+          error: testResult.success
+            ? undefined
+            : testResult.error || "Test execution failed",
+          updatedAt: new Date().toISOString(),
+        });
+      }
     } catch (error) {
       console.error(
         `❌ [MultiAgent] Error executing test case "${tc.title}":`,
@@ -674,6 +730,16 @@ async function evaluateTestCases(
           error instanceof Error ? error.message : "Test execution error",
         relatedUiVersionId: uiVersion.id,
       });
+
+      // Update status to failed
+      if (statusMap) {
+        statusMap.set(tc.id, {
+          status: "failed",
+          error:
+            error instanceof Error ? error.message : "Test execution error",
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -1165,5 +1231,45 @@ export const multiAgentRouter = createTRPCRouter({
       }
       console.log("✅ [MultiAgent] Report found:", report.id);
       return report;
+    }),
+
+  /**
+   * Get test cases with real-time execution status
+   */
+  getTestCases: publicProcedure
+    .input(
+      z.object({
+        testRunId: z.string(),
+      }),
+    )
+    .query(({ input }) => {
+      console.log("📋 [MultiAgent] getTestCases called for:", input.testRunId);
+      const testCases = testCasesStore.get(input.testRunId) || [];
+      const statusMap = testCaseStatusStore.get(input.testRunId) || new Map();
+      console.log("📋 [MultiAgent] Found test cases:", testCases.length);
+      console.log(
+        "📋 [MultiAgent] Test case IDs:",
+        testCases.map((tc) => tc.id),
+      );
+
+      const result = testCases.map((tc) => {
+        const status = statusMap.get(tc.id) || {
+          status: "pending" as TestCaseStatus,
+          updatedAt: new Date().toISOString(),
+        };
+        return {
+          id: tc.id,
+          title: tc.title,
+          description: tc.description,
+          priority: tc.priority,
+          category: tc.category,
+          status: status.status,
+          error: status.error,
+          updatedAt: status.updatedAt,
+        };
+      });
+
+      console.log("📋 [MultiAgent] Returning test cases:", result.length);
+      return result;
     }),
 });
