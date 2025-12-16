@@ -377,11 +377,12 @@ async function optimizeUiForFailures(
   failedResults: TestCaseResult[],
   currentUiVersion: UiVersion,
   requirement: UserRequirement,
-): Promise<{ files: ComponentFile[]; summary: string }> {
+): Promise<{ files: ComponentFile[]; summary: string; shouldSkip: boolean }> {
   if (failedResults.length === 0) {
     return {
       files: currentUiVersion.files,
       summary: "No failures to fix",
+      shouldSkip: true,
     };
   }
 
@@ -396,11 +397,9 @@ async function optimizeUiForFailures(
     console.log(
       "⚠️ [MultiAgent] All failures are due to 'fetch failed' - skipping UI revision",
     );
-    return {
-      files: currentUiVersion.files,
-      summary:
-        "Skipped UI optimization: all failures are infrastructure-related (fetch failed)",
-    };
+    throw new Error(
+      "All test failures are due to infrastructure issues (fetch failed). Cannot optimize UI code.",
+    );
   }
 
   const failureSummary = failedResults
@@ -426,14 +425,11 @@ Please fix the UI to address these failures. Ensure the fixes are focused and mi
     return {
       files: revisedFiles,
       summary: `Optimized UI to fix ${failedResults.length} failing test cases`,
+      shouldSkip: false,
     };
   } catch (error) {
     console.error("Error in optimizeUiForFailures:", error);
-    // Fallback: return original files
-    return {
-      files: currentUiVersion.files,
-      summary: "UI optimization attempted but encountered error",
-    };
+    throw error; // Re-throw the error instead of returning original files
   }
 }
 
@@ -506,91 +502,114 @@ async function runIterativeTestingLoop(
       "Optimizer",
       `Iteration ${iteration}: Optimizing UI...`,
     );
-    const { files: optimizedFiles, summary: optimizationSummary } =
-      await optimizeUiForFailures(failedResults, currentUiVersion, requirement);
 
-    // Save optimized UI to database
-    const newRevision = await ctx.db.componentRevision.create({
-      data: {
+    try {
+      const { files: optimizedFiles, summary: optimizationSummary } =
+        await optimizeUiForFailures(
+          failedResults,
+          currentUiVersion,
+          requirement,
+        );
+
+      // Save optimized UI to database
+      const newRevision = await ctx.db.componentRevision.create({
+        data: {
+          componentId: currentUiVersion.componentId,
+          code: JSON.stringify(optimizedFiles),
+          prompt: `Multi-agent optimization (iteration ${iteration}): ${optimizationSummary}`,
+        },
+      });
+
+      console.log(
+        `[MultiAgent] Created new revision ${newRevision.id} for iteration ${iteration}`,
+      );
+
+      // Update component's code to latest revision
+      await ctx.db.component.update({
+        where: { id: currentUiVersion.componentId },
+        data: { code: JSON.stringify(optimizedFiles) },
+      });
+
+      // Create new UI version
+      const newUiVersionId = `ui_${testRunId}_${iteration}`;
+      currentUiVersion = {
+        id: newUiVersionId,
         componentId: currentUiVersion.componentId,
-        code: JSON.stringify(optimizedFiles),
-        prompt: `Multi-agent optimization (iteration ${iteration}): ${optimizationSummary}`,
-      },
-    });
+        versionIndex: iteration,
+        files: optimizedFiles,
+        revisionId: newRevision.id,
+        createdAt: new Date().toISOString(),
+        createdBy: "optimizer",
+        sourceFailureTestCaseId: failedResults[0]?.testCaseId,
+      };
+      uiVersionsStore.set(newUiVersionId, currentUiVersion);
 
-    console.log(
-      `[MultiAgent] Created new revision ${newRevision.id} for iteration ${iteration}`,
-    );
-
-    // Update component's code to latest revision
-    await ctx.db.component.update({
-      where: { id: currentUiVersion.componentId },
-      data: { code: JSON.stringify(optimizedFiles) },
-    });
-
-    // Create new UI version
-    const newUiVersionId = `ui_${testRunId}_${iteration}`;
-    currentUiVersion = {
-      id: newUiVersionId,
-      componentId: currentUiVersion.componentId,
-      versionIndex: iteration,
-      files: optimizedFiles,
-      revisionId: newRevision.id,
-      createdAt: new Date().toISOString(),
-      createdBy: "optimizer",
-      sourceFailureTestCaseId: failedResults[0]?.testCaseId,
-    };
-    uiVersionsStore.set(newUiVersionId, currentUiVersion);
-
-    updateTimeline(
-      testRunId,
-      "ui-optimization",
-      "Optimizer",
-      optimizationSummary,
-      true,
-    );
-
-    // Re-evaluate only failed test cases (T024)
-    updateTimeline(
-      testRunId,
-      "test-execution",
-      "Evaluator",
-      `Iteration ${iteration}: Regression testing...`,
-    );
-    const regressionResults = await evaluateTestCases(
-      testCases.filter((tc) =>
-        failedResults.some((fr) => fr.testCaseId === tc.id),
-      ),
-      currentUiVersion,
-    );
-
-    updateTimeline(
-      testRunId,
-      "test-execution",
-      "Evaluator",
-      `Iteration ${iteration}: ${
-        regressionResults.filter((r) => r.status === "passed").length
-      }/${regressionResults.length} passed`,
-      true,
-    );
-
-    iterations.push(
-      buildIterationCycle(iteration, currentUiVersion.id, regressionResults),
-    );
-
-    // Update overall test results
-    allTestResults = testCases.map((tc) => {
-      const regressionResult = regressionResults.find(
-        (r) => r.testCaseId === tc.id,
+      updateTimeline(
+        testRunId,
+        "ui-optimization",
+        "Optimizer",
+        optimizationSummary,
+        true,
       );
-      return (
-        regressionResult || allTestResults.find((r) => r.testCaseId === tc.id)!
-      );
-    });
 
-    // Update failed results for next iteration
-    failedResults.length = 0;
-    failedResults.push(...allTestResults.filter((r) => r.status === "failed"));
+      // Re-evaluate only failed test cases (T024)
+      updateTimeline(
+        testRunId,
+        "test-execution",
+        "Evaluator",
+        `Iteration ${iteration}: Regression testing...`,
+      );
+      const regressionResults = await evaluateTestCases(
+        testCases.filter((tc) =>
+          failedResults.some((fr) => fr.testCaseId === tc.id),
+        ),
+        currentUiVersion,
+      );
+
+      updateTimeline(
+        testRunId,
+        "test-execution",
+        "Evaluator",
+        `Iteration ${iteration}: ${
+          regressionResults.filter((r) => r.status === "passed").length
+        }/${regressionResults.length} passed`,
+        true,
+      );
+
+      iterations.push(
+        buildIterationCycle(iteration, currentUiVersion.id, regressionResults),
+      );
+
+      // Update overall test results
+      allTestResults = testCases.map((tc) => {
+        const regressionResult = regressionResults.find(
+          (r) => r.testCaseId === tc.id,
+        );
+        return (
+          regressionResult ||
+          allTestResults.find((r) => r.testCaseId === tc.id)!
+        );
+      });
+
+      // Update failed results for next iteration
+      failedResults.length = 0;
+      failedResults.push(
+        ...allTestResults.filter((r) => r.status === "failed"),
+      );
+    } catch (error) {
+      // If optimization fails due to infrastructure issues, stop the loop
+      console.error(`❌ [MultiAgent] Iteration ${iteration} failed:`, error);
+      updateTimeline(
+        testRunId,
+        "ui-optimization",
+        "Optimizer",
+        `Failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        true,
+      );
+
+      // Exit the loop early
+      break;
+    }
   }
 
   // Determine final status
