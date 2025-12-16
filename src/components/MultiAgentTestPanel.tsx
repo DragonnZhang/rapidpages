@@ -22,17 +22,20 @@ export const MultiAgentTestPanel = ({
   const [testReport, setTestReport] = useState<TestReport | null>(null);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const [isTestPanelVisible, setIsTestPanelVisible] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const router = useRouter();
 
   const startRunMutation = api.multiAgent.startRun.useMutation();
 
+  // Optimized polling with longer intervals
   const { data: runStatus } = api.multiAgent.getRunStatus.useQuery(
     { testRunId: testRunId! },
     {
       enabled: !!testRunId,
       refetchInterval: (data) => {
         if (!data) return false;
-        return data.status === "running" ? 1000 : false;
+        // Poll every 2 seconds when running (reduced from 1 second)
+        return data.status === "running" ? 2000 : false;
       },
     },
   );
@@ -56,57 +59,42 @@ export const MultiAgentTestPanel = ({
       enabled: !!testRunId,
       refetchInterval: (data) => {
         if (!data) return false;
-        // Refetch while there are pending or running tests
+        // Poll every 2 seconds while there are active tests (reduced from 1 second)
         const hasActiveTests = data.some(
           (tc) => tc.status === "pending" || tc.status === "running",
         );
-        return hasActiveTests ? 1000 : false;
+        return hasActiveTests ? 2000 : false;
       },
     },
   );
 
-  useEffect(() => {
-    if (testCases) {
-      console.log(
-        "📋 [Frontend] Test cases loaded:",
-        testCases.length,
-        testCases,
-      );
-    }
-  }, [testCases]);
+  // Test cases will update automatically via polling
 
-  useEffect(() => {
-    console.log(
-      "🎯 [Frontend] Current testRunId:",
-      testRunId,
-      "- Panel visible:",
-      !!testRunId,
-    );
-  }, [testRunId]);
+  // State updates automatically via queries
 
   useEffect(() => {
     if (reportData) {
-      console.log("✅ [Frontend] Report received:", reportData.id);
       setTestReport(reportData);
-
-      // Check if a new revision was created during testing
-      if (testRunId) {
-        const newRevisionId = localStorage.getItem(
-          `test_${testRunId}_newRevision`,
-        );
-        if (newRevisionId) {
-          console.log(
-            "🔄 [Frontend] UI was optimized, reloading page to show new revision...",
-          );
-          localStorage.removeItem(`test_${testRunId}_newRevision`);
-          // Reload the page to show the updated UI
-          setTimeout(() => {
-            router.reload();
-          }, 2000); // Give user time to see the report
-        }
-      }
     }
   }, [reportData, testRunId, router]);
+
+  // Check if test completed and report shows multiple iterations (UI was optimized)
+  useEffect(() => {
+    if (
+      runStatus &&
+      (runStatus.status === "succeeded" ||
+        runStatus.status === "failed" ||
+        runStatus.status === "stopped") &&
+      testReport
+    ) {
+      // If there are multiple iterations, it means UI was optimized
+      if (testReport.iterations && testReport.iterations.length > 1) {
+        setTimeout(() => {
+          router.reload();
+        }, 2000);
+      }
+    }
+  }, [runStatus, testReport, router]);
 
   useEffect(() => {
     if (reportError) {
@@ -129,11 +117,6 @@ export const MultiAgentTestPanel = ({
   const handleStartTest = async () => {
     if (!componentId) return;
 
-    console.log(
-      "🚀 [Frontend] Starting multi-agent test for component:",
-      componentId,
-    );
-
     // Show panel immediately
     setIsTestPanelVisible(true);
     setTestReport(null);
@@ -147,23 +130,11 @@ export const MultiAgentTestPanel = ({
         isRegressionTest: true,
       });
 
-      console.log("✅ [Frontend] Test run started:", result.testRunId);
-
-      // Store latestRevisionId if UI was optimized
-      if (result.latestRevisionId) {
-        console.log(
-          "🔄 [Frontend] New revision created:",
-          result.latestRevisionId,
-        );
-        // We'll refresh the page when test is complete and has a new revision
-        localStorage.setItem(
-          `test_${result.testRunId}_newRevision`,
-          result.latestRevisionId,
-        );
-      }
-
+      // Set testRunId immediately - backend will continue processing in background
       setTestRunId(result.testRunId);
-      console.log("📄 [Frontend] testRunId set to:", result.testRunId);
+
+      // Note: latestRevisionId will be undefined initially since test is running async
+      // We'll detect it when the test completes via polling
     } catch (error) {
       console.error("❌ [Frontend] Failed to start test:", error);
       console.error(
@@ -211,8 +182,8 @@ export const MultiAgentTestPanel = ({
 
       {/* Collapsible Test Panel */}
       {isTestPanelVisible && (
-        <div className="mt-4 max-h-[600px] overflow-y-auto rounded-lg border-2 border-blue-500 bg-blue-50 p-4 shadow-lg">
-          <div className="mb-4 flex items-center justify-between border-b pb-2">
+        <div className="mt-4 rounded-lg border-2 border-blue-500 bg-blue-50 shadow-lg">
+          <div className="flex items-center justify-between border-b border-blue-200 p-4">
             <h3 className="text-lg font-semibold text-blue-600">
               ⚡ 测试执行详情 ⚡
             </h3>
@@ -244,156 +215,183 @@ export const MultiAgentTestPanel = ({
                   ⚠ 达到迭代上限
                 </span>
               )}
+              <button
+                onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+                className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-100"
+                aria-label={isPanelCollapsed ? "展开面板" : "折叠面板"}
+              >
+                <svg
+                  className={`h-5 w-5 transition-transform ${
+                    isPanelCollapsed ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
 
-          {/* Test Cases Status */}
-          <div className="mb-6">
-            <h4 className="mb-3 text-sm font-semibold text-gray-700">
-              测试用例执行状态
-            </h4>
-            {!testRunId ? (
-              <div className="rounded-lg bg-blue-50 p-6 text-center dark:bg-blue-900/20">
-                <Spinner className="mx-auto h-6 w-6 text-blue-600" />
-                <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                  正在启动测试并生成测试用例...
-                </p>
-              </div>
-            ) : !testCases ? (
-              <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
-                <Spinner className="mx-auto h-6 w-6" />
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  正在加载测试用例...
-                </p>
-              </div>
-            ) : testCases.length > 0 ? (
-              <TestCasesPanel
-                testCases={testCases}
-                isRunning={runStatus?.status === "running"}
-              />
-            ) : (
-              <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  暂无测试用例
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Timeline */}
-          {runStatus?.timeline && runStatus.timeline.length > 0 && (
-            <div className="mb-6">
-              <h4 className="mb-3 text-sm font-semibold text-gray-700">
-                执行时间线
-              </h4>
-              <MultiAgentRunTimeline timeline={runStatus.timeline} />
-            </div>
-          )}
-
-          {/* Test Report */}
-          {testReport && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="mb-2 text-sm font-semibold text-gray-700">
-                  测试报告
+          {!isPanelCollapsed && (
+            <div className="max-h-[600px] overflow-y-auto p-4">
+              {/* Test Cases Status */}
+              <div className="mb-6">
+                <h4 className="mb-3 text-sm font-semibold text-gray-700">
+                  测试用例执行状态
                 </h4>
-                <p className="text-sm text-gray-600">{testReport.summary}</p>
+                {!testRunId ? (
+                  <div className="rounded-lg bg-blue-50 p-6 text-center dark:bg-blue-900/20">
+                    <Spinner className="mx-auto h-6 w-6 text-blue-600" />
+                    <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                      正在启动测试并生成测试用例...
+                    </p>
+                  </div>
+                ) : !testCases ? (
+                  <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
+                    <Spinner className="mx-auto h-6 w-6" />
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      正在加载测试用例...
+                    </p>
+                  </div>
+                ) : testCases.length > 0 ? (
+                  <TestCasesPanel
+                    testCases={testCases}
+                    isRunning={runStatus?.status === "running"}
+                  />
+                ) : (
+                  <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      暂无测试用例
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Statistics Grid */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {testReport.stats.totalCases}
-                  </div>
-                  <div className="text-xs text-blue-600">总测试用例</div>
-                </div>
-                <div className="rounded-lg bg-green-50 p-3">
-                  <div className="text-2xl font-bold text-green-700">
-                    {testReport.stats.passed}
-                  </div>
-                  <div className="text-xs text-green-600">通过</div>
-                </div>
-                <div className="rounded-lg bg-red-50 p-3">
-                  <div className="text-2xl font-bold text-red-700">
-                    {testReport.stats.failed}
-                  </div>
-                  <div className="text-xs text-red-600">失败</div>
-                </div>
-              </div>
-
-              {/* Coverage Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="mb-1 text-lg font-semibold text-gray-700">
-                    {testReport.stats.coreFlowCoverage}%
-                  </div>
-                  <div className="text-xs text-gray-500">核心流程覆盖</div>
-                </div>
-                <div className="text-center">
-                  <div className="mb-1 text-lg font-semibold text-gray-700">
-                    {testReport.stats.usabilityCoverage}%
-                  </div>
-                  <div className="text-xs text-gray-500">可用性覆盖</div>
-                </div>
-                <div className="text-center">
-                  <div className="mb-1 text-lg font-semibold text-gray-700">
-                    {testReport.stats.edgeCoverage}%
-                  </div>
-                  <div className="text-xs text-gray-500">边界情况覆盖</div>
-                </div>
-              </div>
-
-              {/* Failures */}
-              {testReport.failures.length > 0 && (
-                <div>
-                  <h4 className="mb-2 text-sm font-semibold text-gray-700">
-                    失败的测试用例
+              {/* Timeline */}
+              {runStatus?.timeline && runStatus.timeline.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="mb-3 text-sm font-semibold text-gray-700">
+                    执行时间线
                   </h4>
-                  <div className="space-y-2">
-                    {testReport.failures.map((failure, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded border-l-4 border-red-400 bg-red-50 p-3"
-                      >
-                        <div className="text-sm font-medium text-red-800">
-                          测试用例: {failure.testCaseId}
-                        </div>
-                        {failure.lastFailureReason && (
-                          <div className="mt-1 text-xs text-red-600">
-                            {failure.lastFailureReason}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <MultiAgentRunTimeline timeline={runStatus.timeline} />
                 </div>
               )}
 
-              {/* Iterations */}
-              {testReport.iterations.length > 0 && (
-                <div>
-                  <h4 className="mb-2 text-sm font-semibold text-gray-700">
-                    迭代历史
-                  </h4>
-                  <div className="space-y-2">
-                    {testReport.iterations.map((iteration, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                      >
-                        <div className="mb-1 text-sm font-medium text-gray-700">
-                          迭代 {iteration.index}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {iteration.changesSummary}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          UI Version: {iteration.uiVersionId}
-                        </div>
-                      </div>
-                    ))}
+              {/* Test Report */}
+              {testReport && (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-gray-700">
+                      测试报告
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {testReport.summary}
+                    </p>
                   </div>
+
+                  {/* Statistics Grid */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-lg bg-blue-50 p-3">
+                      <div className="text-2xl font-bold text-blue-700">
+                        {testReport.stats.totalCases}
+                      </div>
+                      <div className="text-xs text-blue-600">总测试用例</div>
+                    </div>
+                    <div className="rounded-lg bg-green-50 p-3">
+                      <div className="text-2xl font-bold text-green-700">
+                        {testReport.stats.passed}
+                      </div>
+                      <div className="text-xs text-green-600">通过</div>
+                    </div>
+                    <div className="rounded-lg bg-red-50 p-3">
+                      <div className="text-2xl font-bold text-red-700">
+                        {testReport.stats.failed}
+                      </div>
+                      <div className="text-xs text-red-600">失败</div>
+                    </div>
+                  </div>
+
+                  {/* Coverage Stats */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="mb-1 text-lg font-semibold text-gray-700">
+                        {testReport.stats.coreFlowCoverage}%
+                      </div>
+                      <div className="text-xs text-gray-500">核心流程覆盖</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="mb-1 text-lg font-semibold text-gray-700">
+                        {testReport.stats.usabilityCoverage}%
+                      </div>
+                      <div className="text-xs text-gray-500">可用性覆盖</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="mb-1 text-lg font-semibold text-gray-700">
+                        {testReport.stats.edgeCoverage}%
+                      </div>
+                      <div className="text-xs text-gray-500">边界情况覆盖</div>
+                    </div>
+                  </div>
+
+                  {/* Failures */}
+                  {testReport.failures.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">
+                        失败的测试用例
+                      </h4>
+                      <div className="space-y-2">
+                        {testReport.failures.map((failure, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded border-l-4 border-red-400 bg-red-50 p-3"
+                          >
+                            <div className="text-sm font-medium text-red-800">
+                              测试用例: {failure.testCaseId}
+                            </div>
+                            {failure.lastFailureReason && (
+                              <div className="mt-1 text-xs text-red-600">
+                                {failure.lastFailureReason}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Iterations */}
+                  {testReport.iterations.length > 0 && (
+                    <div>
+                      <h4 className="mb-2 text-sm font-semibold text-gray-700">
+                        迭代历史
+                      </h4>
+                      <div className="space-y-2">
+                        {testReport.iterations.map((iteration, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                          >
+                            <div className="mb-1 text-sm font-medium text-gray-700">
+                              迭代 {iteration.index}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {iteration.changesSummary}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              UI Version: {iteration.uiVersionId}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

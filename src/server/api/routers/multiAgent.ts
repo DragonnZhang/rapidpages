@@ -8,6 +8,8 @@ import { generateText } from "ai";
 import { parseCodeToComponentFiles } from "~/utils/codeTransformer";
 import type { MediaItem } from "~/types/multimodal";
 import { executeMcpTest } from "./mcp";
+import { EventEmitter } from "events";
+import { observable } from "@trpc/server/observable";
 
 // ============================================================================
 // Data Types (from data-model.md)
@@ -165,6 +167,10 @@ const testCaseStatusStore = new Map<
   string,
   Map<string, { status: TestCaseStatus; error?: string; updatedAt: string }>
 >();
+
+// Event emitter for real-time updates
+const testRunEmitter = new EventEmitter();
+testRunEmitter.setMaxListeners(100); // Support multiple concurrent test runs
 
 // ============================================================================
 // Helper Functions for US1 Core Orchestration
@@ -361,11 +367,9 @@ ${uiDescription}`,
     });
   });
   testCaseStatusStore.set(testRunId, statusMap);
-  console.log(
-    "💾 [MultiAgent] Initialized status for",
-    statusMap.size,
-    "test cases",
-  );
+
+  // Emit initial update with test cases
+  emitTestRunUpdate(testRunId);
 
   return testCases;
 }
@@ -661,6 +665,7 @@ async function evaluateTestCases(
         status: "running",
         updatedAt: new Date().toISOString(),
       });
+      emitTestRunUpdate(testRunId); // Notify subscribers
     }
 
     try {
@@ -726,6 +731,7 @@ async function evaluateTestCases(
             : testResult.error || "Test execution failed",
           updatedAt: new Date().toISOString(),
         });
+        emitTestRunUpdate(testRunId); // Notify subscribers
       }
     } catch (error) {
       console.error(
@@ -758,6 +764,7 @@ async function evaluateTestCases(
             error instanceof Error ? error.message : "Test execution error",
           updatedAt: new Date().toISOString(),
         });
+        emitTestRunUpdate(testRunId); // Notify subscribers
       }
     }
   }
@@ -934,6 +941,40 @@ function updateTimeline(
   }
 
   timelinesStore.set(testRunId, timeline);
+
+  // Emit update event for subscriptions
+  emitTestRunUpdate(testRunId);
+}
+
+/**
+ * Helper: Emit update event for test run
+ */
+function emitTestRunUpdate(testRunId: string) {
+  const status = getRunStatusInternal(testRunId);
+  const testCases = testCasesStore.get(testRunId) || [];
+  const statusMap = testCaseStatusStore.get(testRunId) || new Map();
+
+  const testCasesWithStatus = testCases.map((tc) => {
+    const tcStatus = statusMap.get(tc.id) || {
+      status: "pending" as TestCaseStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    return {
+      id: tc.id,
+      title: tc.title,
+      description: tc.description,
+      priority: tc.priority,
+      category: tc.category,
+      status: tcStatus.status,
+      error: tcStatus.error,
+      updatedAt: tcStatus.updatedAt,
+    };
+  });
+
+  testRunEmitter.emit(`update:${testRunId}`, {
+    status,
+    testCases: testCasesWithStatus,
+  });
 }
 
 // ============================================================================
@@ -989,227 +1030,255 @@ export const multiAgentRouter = createTRPCRouter({
         hasMedia: !!input.media?.length,
       });
 
-      try {
-        // Phase 1: Requirement parsing
-        updateTimeline(
-          testRunId,
-          "requirement-parsing",
-          "Requirement Parser",
-          "Analyzing user requirement...",
-        );
-        console.log("📋 [MultiAgent] Parsing requirement...");
-        const requirement = await parseRequirement(
-          input.requirementText,
-          requirementId,
-        );
-        console.log("✅ [MultiAgent] Requirement parsed:", {
-          goals: requirement.parsedGoals.length,
-          actions: requirement.keyActions.length,
-        });
-        updateTimeline(
-          testRunId,
-          "requirement-parsing",
-          "Requirement Parser",
-          `Parsed ${requirement.parsedGoals.length} goals`,
-          true,
-        );
+      // Create initial TestRun immediately so frontend can query it
+      const initialTestRun: TestRun = {
+        id: testRunId,
+        requirementId,
+        initialUiVersionId,
+        createdAt: new Date().toISOString(),
+        status: "running",
+        currentIterationIndex: 0,
+        maxIterations: 3,
+        testCases: [],
+        iterations: [],
+        componentId: input.componentId,
+      };
+      testRunsStore.set(testRunId, initialTestRun);
+      console.log("✅ [MultiAgent] Initial test run stored:", testRunId);
 
-        let uiVersion: UiVersion;
-
-        // Phase 2a: Load existing UI (US4 Regression) OR Generate new UI (US1-2)
-        if (input.componentId) {
-          // T033: Load existing component for regression/testing
+      // Execute the actual testing asynchronously (don't await)
+      (async () => {
+        try {
+          // Phase 1: Requirement parsing
           updateTimeline(
             testRunId,
-            "ui-generation",
-            "UI Loader",
-            "Loading existing UI...",
+            "requirement-parsing",
+            "Requirement Parser",
+            "Analyzing user requirement...",
+          );
+          console.log("📋 [MultiAgent] Parsing requirement...");
+          const requirement = await parseRequirement(
+            input.requirementText,
+            requirementId,
+          );
+          console.log("✅ [MultiAgent] Requirement parsed:", {
+            goals: requirement.parsedGoals.length,
+            actions: requirement.keyActions.length,
+          });
+          updateTimeline(
+            testRunId,
+            "requirement-parsing",
+            "Requirement Parser",
+            `Parsed ${requirement.parsedGoals.length} goals`,
+            true,
           );
 
-          try {
-            const component = await ctx.db.component.findUnique({
-              where: { id: input.componentId },
-              include: { revisions: true },
-            });
+          let uiVersion: UiVersion;
 
-            if (!component) {
-              throw new Error(`Component ${input.componentId} not found`);
-            }
-
-            // Get the latest revision's code
-            const latestRevision =
-              component.revisions[component.revisions.length - 1];
-            const files = latestRevision
-              ? parseCodeToComponentFiles(latestRevision.code)
-              : parseCodeToComponentFiles(component.code);
-
-            uiVersion = {
-              id: initialUiVersionId,
-              componentId: input.componentId,
-              versionIndex: 0,
-              files,
-              createdAt: new Date().toISOString(),
-              createdBy: "generator",
-            };
-
+          // Phase 2a: Load existing UI (US4 Regression) OR Generate new UI (US1-2)
+          if (input.componentId) {
+            // T033: Load existing component for regression/testing
             updateTimeline(
               testRunId,
               "ui-generation",
               "UI Loader",
-              `Loaded existing UI with ${files.length} files${
-                input.isRegressionTest ? " for regression testing" : ""
-              }`,
+              "Loading existing UI...",
+            );
+
+            try {
+              const component = await ctx.db.component.findUnique({
+                where: { id: input.componentId },
+                include: { revisions: true },
+              });
+
+              if (!component) {
+                throw new Error(`Component ${input.componentId} not found`);
+              }
+
+              // Get the latest revision's code
+              const latestRevision =
+                component.revisions[component.revisions.length - 1];
+              const files = latestRevision
+                ? parseCodeToComponentFiles(latestRevision.code)
+                : parseCodeToComponentFiles(component.code);
+
+              uiVersion = {
+                id: initialUiVersionId,
+                componentId: input.componentId,
+                versionIndex: 0,
+                files,
+                createdAt: new Date().toISOString(),
+                createdBy: "generator",
+              };
+
+              updateTimeline(
+                testRunId,
+                "ui-generation",
+                "UI Loader",
+                `Loaded existing UI with ${files.length} files${
+                  input.isRegressionTest ? " for regression testing" : ""
+                }`,
+                true,
+              );
+            } catch (error) {
+              console.error("Error loading component:", error);
+              throw new Error(
+                `Failed to load component: ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`,
+              );
+            }
+          } else {
+            // Phase 2b: Generate new UI (US1-2)
+            updateTimeline(
+              testRunId,
+              "ui-generation",
+              "UI Generator",
+              "Generating UI from requirement...",
+            );
+            uiVersion = await generateInitialUi(
+              input.requirementText,
+              initialUiVersionId,
+              input.media,
+            );
+            updateTimeline(
+              testRunId,
+              "ui-generation",
+              "UI Generator",
+              `Generated UI with ${uiVersion.files.length} files`,
               true,
             );
-          } catch (error) {
-            console.error("Error loading component:", error);
-            throw new Error(
-              `Failed to load component: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
-            );
           }
-        } else {
-          // Phase 2b: Generate new UI (US1-2)
+
+          // Phase 3: Test Case Generation (T034: Mark as old/new for US4)
           updateTimeline(
             testRunId,
-            "ui-generation",
-            "UI Generator",
-            "Generating UI from requirement...",
+            "testcase-generation",
+            "Test Planner",
+            "Generating test cases...",
           );
-          uiVersion = await generateInitialUi(
-            input.requirementText,
-            initialUiVersionId,
-            input.media,
-          );
-          updateTimeline(
-            testRunId,
-            "ui-generation",
-            "UI Generator",
-            `Generated UI with ${uiVersion.files.length} files`,
-            true,
-          );
-        }
-
-        // Phase 3: Test Case Generation (T034: Mark as old/new for US4)
-        updateTimeline(
-          testRunId,
-          "testcase-generation",
-          "Test Planner",
-          "Generating test cases...",
-        );
-        console.log("📝 [MultiAgent] Generating test cases...");
-        const testCases = await generateTestCases(
-          requirement,
-          uiVersion,
-          testRunId,
-        );
-
-        console.log("✅ [MultiAgent] Test cases generated:", testCases);
-
-        // T034: Tag test cases for regression scenarios
-        if (input.isRegressionTest) {
-          // Mark first 50% as old, rest as new
-          const newCutoff = Math.ceil(testCases.length / 2);
-          testCases.forEach((tc, idx) => {
-            (tc as unknown as Record<string, unknown>).isNewCase =
-              idx >= newCutoff;
-          });
-        }
-
-        updateTimeline(
-          testRunId,
-          "testcase-generation",
-          "Test Planner",
-          `Generated ${testCases.length} test cases${
-            input.isRegressionTest ? " (regression)" : ""
-          }`,
-          true,
-        );
-
-        // Phase 4-5: Iterative Testing and Optimization (T023-T024) (US2)
-        console.log("🔄 [MultiAgent] Starting iterative testing loop...");
-        const { iterations, finalStatus, latestRevisionId } =
-          await runIterativeTestingLoop(
-            testRunId,
+          console.log("📝 [MultiAgent] Generating test cases...");
+          const testCases = await generateTestCases(
             requirement,
             uiVersion,
-            testCases,
-            ctx,
-            uiVersion.revisionId,
+            testRunId,
           );
-        console.log("✅ [MultiAgent] Testing loop completed:", {
-          iterations: iterations.length,
-          status: finalStatus,
-          latestRevisionId,
-        });
 
-        // Phase 6: Report Generation (T015)
-        updateTimeline(
-          testRunId,
-          "report-generation",
-          "Reporter",
-          "Generating test report...",
-        );
-        console.log("📊 [MultiAgent] Generating test report...");
-        const report = generateTestReport(testRunId, iterations, testCases);
-        testReportsStore.set(testRunId, report);
-        console.log("✅ [MultiAgent] Report stored:", {
-          testRunId,
-          reportId: report.id,
-          totalCases: report.stats.totalCases,
-          passed: report.stats.passed,
-          failed: report.stats.failed,
-          coverage: {
-            coreFlow: report.stats.coreFlowCoverage,
-            usability: report.stats.usabilityCoverage,
-            edge: report.stats.edgeCoverage,
-          },
-        });
-        updateTimeline(
-          testRunId,
-          "report-generation",
-          "Reporter",
-          "Report ready",
-          true,
-        );
+          console.log("✅ [MultiAgent] Test cases generated:", testCases);
 
-        // Create and store TestRun
-        const testRun: TestRun = {
-          id: testRunId,
-          requirementId,
-          initialUiVersionId,
-          createdAt: new Date().toISOString(),
-          status: finalStatus,
-          currentIterationIndex: iterations.length - 1,
-          maxIterations: 3,
-          testCases,
-          iterations,
-          componentId: uiVersion.componentId,
-        };
+          // T034: Tag test cases for regression scenarios
+          if (input.isRegressionTest) {
+            // Mark first 50% as old, rest as new
+            const newCutoff = Math.ceil(testCases.length / 2);
+            testCases.forEach((tc, idx) => {
+              (tc as unknown as Record<string, unknown>).isNewCase =
+                idx >= newCutoff;
+            });
+          }
 
-        testRunsStore.set(testRunId, testRun);
-        console.log("✅ [MultiAgent] Test run completed successfully:", {
-          testRunId,
-          componentId: uiVersion.componentId,
-          status: finalStatus,
-          latestRevisionId,
-        });
+          updateTimeline(
+            testRunId,
+            "testcase-generation",
+            "Test Planner",
+            `Generated ${testCases.length} test cases${
+              input.isRegressionTest ? " (regression)" : ""
+            }`,
+            true,
+          );
 
-        return {
-          testRunId,
-          initialUiVersionId,
-          requirementId,
-          latestRevisionId,
-        };
-      } catch (error) {
-        console.error("❌ [MultiAgent] Error in startRun:", error);
-        console.error(
-          "Stack trace:",
-          error instanceof Error ? error.stack : error,
-        );
-        throw error;
-      }
+          // Phase 4-5: Iterative Testing and Optimization (T023-T024) (US2)
+          console.log("🔄 [MultiAgent] Starting iterative testing loop...");
+          const { iterations, finalStatus, latestRevisionId } =
+            await runIterativeTestingLoop(
+              testRunId,
+              requirement,
+              uiVersion,
+              testCases,
+              ctx,
+              uiVersion.revisionId,
+            );
+          console.log("✅ [MultiAgent] Testing loop completed:", {
+            iterations: iterations.length,
+            status: finalStatus,
+            latestRevisionId,
+          });
+
+          // Phase 6: Report Generation (T015)
+          updateTimeline(
+            testRunId,
+            "report-generation",
+            "Reporter",
+            "Generating test report...",
+          );
+          console.log("📊 [MultiAgent] Generating test report...");
+          const report = generateTestReport(testRunId, iterations, testCases);
+          testReportsStore.set(testRunId, report);
+          console.log("✅ [MultiAgent] Report stored:", {
+            testRunId,
+            reportId: report.id,
+            totalCases: report.stats.totalCases,
+            passed: report.stats.passed,
+            failed: report.stats.failed,
+            coverage: {
+              coreFlow: report.stats.coreFlowCoverage,
+              usability: report.stats.usabilityCoverage,
+              edge: report.stats.edgeCoverage,
+            },
+          });
+          updateTimeline(
+            testRunId,
+            "report-generation",
+            "Reporter",
+            "Report ready",
+            true,
+          );
+
+          // Update TestRun with final results
+          const testRun: TestRun = {
+            id: testRunId,
+            requirementId,
+            initialUiVersionId,
+            createdAt: new Date().toISOString(),
+            status: finalStatus,
+            currentIterationIndex: iterations.length - 1,
+            maxIterations: 3,
+            testCases,
+            iterations,
+            componentId: uiVersion.componentId,
+          };
+
+          testRunsStore.set(testRunId, testRun);
+          console.log("✅ [MultiAgent] Test run completed successfully:", {
+            testRunId,
+            componentId: uiVersion.componentId,
+            status: finalStatus,
+            latestRevisionId,
+          });
+        } catch (error) {
+          console.error(
+            "❌ [MultiAgent] Error in async test execution:",
+            error,
+          );
+          console.error(
+            "Stack trace:",
+            error instanceof Error ? error.stack : error,
+          );
+          // Update test run with error status
+          const errorTestRun = testRunsStore.get(testRunId);
+          if (errorTestRun) {
+            errorTestRun.status = "failed";
+            testRunsStore.set(testRunId, errorTestRun);
+          }
+        }
+      })();
+
+      // Return immediately with testRunId
+      return {
+        testRunId,
+        initialUiVersionId,
+        requirementId,
+        latestRevisionId: undefined,
+      };
     }),
 
   /**
@@ -1222,10 +1291,7 @@ export const multiAgentRouter = createTRPCRouter({
       }),
     )
     .query(({ input }) => {
-      console.log("📡 [MultiAgent] Getting run status for:", input.testRunId);
-      const status = getRunStatusInternal(input.testRunId);
-      console.log("📊 [MultiAgent] Current status:", status.status);
-      return status;
+      return getRunStatusInternal(input.testRunId);
     }),
 
   /**
@@ -1262,14 +1328,8 @@ export const multiAgentRouter = createTRPCRouter({
       }),
     )
     .query(({ input }) => {
-      console.log("📋 [MultiAgent] getTestCases called for:", input.testRunId);
       const testCases = testCasesStore.get(input.testRunId) || [];
       const statusMap = testCaseStatusStore.get(input.testRunId) || new Map();
-      console.log("📋 [MultiAgent] Found test cases:", testCases.length);
-      console.log(
-        "📋 [MultiAgent] Test case IDs:",
-        testCases.map((tc) => tc.id),
-      );
 
       const result = testCases.map((tc) => {
         const status = statusMap.get(tc.id) || {
@@ -1288,7 +1348,82 @@ export const multiAgentRouter = createTRPCRouter({
         };
       });
 
-      console.log("📋 [MultiAgent] Returning test cases:", result.length);
       return result;
+    }),
+
+  /**
+   * Subscribe to real-time test run updates (replaces polling)
+   */
+  onTestRunUpdate: publicProcedure
+    .input(
+      z.object({
+        testRunId: z.string(),
+      }),
+    )
+    .subscription(({ input }) => {
+      return observable<{
+        status: {
+          status: TestRunStatus;
+          currentIterationIndex: number;
+          maxIterations: number;
+          timeline: TimelineEvent[];
+          componentId?: string;
+        };
+        testCases: Array<{
+          id: string;
+          title: string;
+          description: string;
+          priority: TestCasePriority;
+          category: TestCaseCategory;
+          status: TestCaseStatus;
+          error?: string;
+          updatedAt: string;
+        }>;
+      }>((emit) => {
+        const eventName = `update:${input.testRunId}`;
+
+        // Send initial data immediately
+        const initialStatus = getRunStatusInternal(input.testRunId);
+        const initialTestCases = testCasesStore.get(input.testRunId) || [];
+        const initialStatusMap =
+          testCaseStatusStore.get(input.testRunId) || new Map();
+
+        const initialTestCasesWithStatus = initialTestCases.map((tc) => {
+          const tcStatus = initialStatusMap.get(tc.id) || {
+            status: "pending" as TestCaseStatus,
+            updatedAt: new Date().toISOString(),
+          };
+          return {
+            id: tc.id,
+            title: tc.title,
+            description: tc.description,
+            priority: tc.priority,
+            category: tc.category,
+            status: tcStatus.status,
+            error: tcStatus.error,
+            updatedAt: tcStatus.updatedAt,
+          };
+        });
+
+        emit.next({
+          status: initialStatus,
+          testCases: initialTestCasesWithStatus,
+        });
+
+        // Listen for updates
+        const onUpdate = (data: {
+          status: typeof initialStatus;
+          testCases: typeof initialTestCasesWithStatus;
+        }) => {
+          emit.next(data);
+        };
+
+        testRunEmitter.on(eventName, onUpdate);
+
+        // Cleanup on unsubscribe
+        return () => {
+          testRunEmitter.off(eventName, onUpdate);
+        };
+      });
     }),
 });
