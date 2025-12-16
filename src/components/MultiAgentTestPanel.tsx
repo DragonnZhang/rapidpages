@@ -21,6 +21,7 @@ export const MultiAgentTestPanel = ({
   const [testRunId, setTestRunId] = useState<string | null>(null);
   const [testReport, setTestReport] = useState<TestReport | null>(null);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const [isTestPanelVisible, setIsTestPanelVisible] = useState(false);
   const router = useRouter();
 
   const startRunMutation = api.multiAgent.startRun.useMutation();
@@ -133,6 +134,10 @@ export const MultiAgentTestPanel = ({
       componentId,
     );
 
+    // Show panel immediately
+    setIsTestPanelVisible(true);
+    setTestReport(null);
+
     try {
       const result = await startRunMutation.mutateAsync({
         requirementText: `Test existing component: ${
@@ -158,7 +163,6 @@ export const MultiAgentTestPanel = ({
       }
 
       setTestRunId(result.testRunId);
-      setTestReport(null);
       console.log("📄 [Frontend] testRunId set to:", result.testRunId);
     } catch (error) {
       console.error("❌ [Frontend] Failed to start test:", error);
@@ -166,12 +170,15 @@ export const MultiAgentTestPanel = ({
         "Error details:",
         error instanceof Error ? error.message : error,
       );
+      // Hide panel on error
+      setIsTestPanelVisible(false);
     }
   };
 
   const handleReset = () => {
     setTestRunId(null);
     setTestReport(null);
+    setIsTestPanelVisible(false);
   };
 
   return (
@@ -195,7 +202,7 @@ export const MultiAgentTestPanel = ({
           )}
         </Button>
 
-        {testRunId && runStatus?.status !== "running" && (
+        {isTestPanelVisible && runStatus?.status !== "running" && (
           <Button onClick={handleReset} variant="secondary" className="text-sm">
             重置
           </Button>
@@ -203,13 +210,19 @@ export const MultiAgentTestPanel = ({
       </div>
 
       {/* Collapsible Test Panel */}
-      {testRunId && (
+      {isTestPanelVisible && (
         <div className="mt-4 max-h-[600px] overflow-y-auto rounded-lg border-2 border-blue-500 bg-blue-50 p-4 shadow-lg">
           <div className="mb-4 flex items-center justify-between border-b pb-2">
             <h3 className="text-lg font-semibold text-blue-600">
               ⚡ 测试执行详情 ⚡
             </h3>
             <div className="flex items-center gap-2">
+              {!testRunId && startRunMutation.isLoading && (
+                <span className="flex items-center gap-1 text-sm text-blue-600">
+                  <Spinner className="h-4 w-4" />
+                  正在启动测试...
+                </span>
+              )}
               {runStatus?.status === "running" && (
                 <span className="flex items-center gap-1 text-sm text-blue-600">
                   <Spinner className="h-4 w-4" />
@@ -239,7 +252,14 @@ export const MultiAgentTestPanel = ({
             <h4 className="mb-3 text-sm font-semibold text-gray-700">
               测试用例执行状态
             </h4>
-            {!testCases ? (
+            {!testRunId ? (
+              <div className="rounded-lg bg-blue-50 p-6 text-center dark:bg-blue-900/20">
+                <Spinner className="mx-auto h-6 w-6 text-blue-600" />
+                <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                  正在启动测试并生成测试用例...
+                </p>
+              </div>
+            ) : !testCases ? (
               <div className="rounded-lg bg-gray-50 p-6 text-center dark:bg-gray-700">
                 <Spinner className="mx-auto h-6 w-6" />
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
