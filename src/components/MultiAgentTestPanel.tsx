@@ -53,8 +53,25 @@ export const MultiAgentTestPanel = ({
     if (reportData) {
       console.log("✅ [Frontend] Report received:", reportData.id);
       setTestReport(reportData);
+
+      // Check if a new revision was created during testing
+      if (testRunId) {
+        const newRevisionId = localStorage.getItem(
+          `test_${testRunId}_newRevision`,
+        );
+        if (newRevisionId) {
+          console.log(
+            "🔄 [Frontend] UI was optimized, reloading page to show new revision...",
+          );
+          localStorage.removeItem(`test_${testRunId}_newRevision`);
+          // Reload the page to show the updated UI
+          setTimeout(() => {
+            router.reload();
+          }, 2000); // Give user time to see the report
+        }
+      }
     }
-  }, [reportData]);
+  }, [reportData, testRunId, router]);
 
   useEffect(() => {
     if (reportError) {
@@ -92,6 +109,20 @@ export const MultiAgentTestPanel = ({
       });
 
       console.log("✅ [Frontend] Test run started:", result.testRunId);
+
+      // Store latestRevisionId if UI was optimized
+      if (result.latestRevisionId) {
+        console.log(
+          "🔄 [Frontend] New revision created:",
+          result.latestRevisionId,
+        );
+        // We'll refresh the page when test is complete and has a new revision
+        localStorage.setItem(
+          `test_${result.testRunId}_newRevision`,
+          result.latestRevisionId,
+        );
+      }
+
       setTestRunId(result.testRunId);
       setTestReport(null);
       setIsOpen(true);

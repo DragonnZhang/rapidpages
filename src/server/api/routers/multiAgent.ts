@@ -351,6 +351,24 @@ async function optimizeUiForFailures(
     };
   }
 
+  // Check if all failures are due to "fetch failed" - infrastructure issue, not UI code issue
+  const allFetchFailed = failedResults.every(
+    (r) =>
+      r.failureReason?.toLowerCase().includes("fetch failed") ||
+      r.failureReason === "fetch failed",
+  );
+
+  if (allFetchFailed) {
+    console.log(
+      "⚠️ [MultiAgent] All failures are due to 'fetch failed' - skipping UI revision",
+    );
+    return {
+      files: currentUiVersion.files,
+      summary:
+        "Skipped UI optimization: all failures are infrastructure-related (fetch failed)",
+    };
+  }
+
   const failureSummary = failedResults
     .map(
       (r) => `Test case ${r.testCaseId}: ${r.failureReason || "Unknown error"}`,
@@ -393,7 +411,13 @@ async function runIterativeTestingLoop(
   requirement: UserRequirement,
   initialUiVersion: UiVersion,
   testCases: TestCase[],
-): Promise<{ iterations: IterationCycle[]; finalStatus: TestRunStatus }> {
+  ctx: { db: any },
+  baseRevisionId?: string,
+): Promise<{
+  iterations: IterationCycle[];
+  finalStatus: TestRunStatus;
+  latestRevisionId?: string;
+}> {
   const maxIterations = 3;
   const iterations: IterationCycle[] = [];
   let currentUiVersion = initialUiVersion;
@@ -451,6 +475,25 @@ async function runIterativeTestingLoop(
     const { files: optimizedFiles, summary: optimizationSummary } =
       await optimizeUiForFailures(failedResults, currentUiVersion, requirement);
 
+    // Save optimized UI to database
+    const newRevision = await ctx.db.componentRevision.create({
+      data: {
+        componentId: currentUiVersion.componentId,
+        code: JSON.stringify(optimizedFiles),
+        prompt: `Multi-agent optimization (iteration ${iteration}): ${optimizationSummary}`,
+      },
+    });
+
+    console.log(
+      `[MultiAgent] Created new revision ${newRevision.id} for iteration ${iteration}`,
+    );
+
+    // Update component's code to latest revision
+    await ctx.db.component.update({
+      where: { id: currentUiVersion.componentId },
+      data: { code: JSON.stringify(optimizedFiles) },
+    });
+
     // Create new UI version
     const newUiVersionId = `ui_${testRunId}_${iteration}`;
     currentUiVersion = {
@@ -458,6 +501,7 @@ async function runIterativeTestingLoop(
       componentId: currentUiVersion.componentId,
       versionIndex: iteration,
       files: optimizedFiles,
+      revisionId: newRevision.id,
       createdAt: new Date().toISOString(),
       createdBy: "optimizer",
       sourceFailureTestCaseId: failedResults[0]?.testCaseId,
@@ -529,6 +573,7 @@ async function runIterativeTestingLoop(
   return {
     iterations,
     finalStatus,
+    latestRevisionId: currentUiVersion.revisionId,
   };
 }
 
@@ -999,15 +1044,19 @@ export const multiAgentRouter = createTRPCRouter({
 
         // Phase 4-5: Iterative Testing and Optimization (T023-T024) (US2)
         console.log("🔄 [MultiAgent] Starting iterative testing loop...");
-        const { iterations, finalStatus } = await runIterativeTestingLoop(
-          testRunId,
-          requirement,
-          uiVersion,
-          testCases,
-        );
+        const { iterations, finalStatus, latestRevisionId } =
+          await runIterativeTestingLoop(
+            testRunId,
+            requirement,
+            uiVersion,
+            testCases,
+            ctx,
+            uiVersion.revisionId,
+          );
         console.log("✅ [MultiAgent] Testing loop completed:", {
           iterations: iterations.length,
           status: finalStatus,
+          latestRevisionId,
         });
 
         // Phase 6: Report Generation (T015)
@@ -1059,12 +1108,14 @@ export const multiAgentRouter = createTRPCRouter({
           testRunId,
           componentId: uiVersion.componentId,
           status: finalStatus,
+          latestRevisionId,
         });
 
         return {
           testRunId,
           initialUiVersionId,
           requirementId,
+          latestRevisionId,
         };
       } catch (error) {
         console.error("❌ [MultiAgent] Error in startRun:", error);
