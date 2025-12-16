@@ -40,7 +40,11 @@ export async function runIterativeTestingLoop(
     "Running initial tests...",
   );
   console.log("🧪 [MultiAgent] Running initial test evaluation...");
-  const testResults = await evaluateTestCases(testCases, currentUiVersion);
+  const testResults = await evaluateTestCases(
+    testCases,
+    currentUiVersion,
+    testRunId,
+  );
   const passedCount = testResults.filter((r) => r.status === "passed").length;
   console.log("📊 [MultiAgent] Initial test results:", {
     passed: passedCount,
@@ -143,6 +147,7 @@ export async function runIterativeTestingLoop(
           failedResults.some((fr) => fr.testCaseId === tc.id),
         ),
         currentUiVersion,
+        testRunId,
       );
 
       updateTimeline(

@@ -22,11 +22,12 @@ import { type ComponentFile } from "~/utils/compiler";
 import { ActionTimeline } from "./ActionTimeline";
 import { InteractiveLogicModal } from "./InteractiveLogicModal";
 import { McpTestButton } from "./McpTestButton";
-import { useSetAtom } from "jotai";
+import { useSetAtom, useAtom } from "jotai";
 import {
   interactiveLogicModalAtom,
   type ElementSelectionDetail,
 } from "~/store/interactiveLogicStore";
+import { actionHistoryVisibleAtom } from "~/store/actionHistoryStore";
 
 export const EditorTabs = ({
   code,
@@ -41,6 +42,9 @@ export const EditorTabs = ({
   >("none");
   const { tabs } = useComponentProvider();
   const setLogicModalState = useSetAtom(interactiveLogicModalAtom);
+  const [actionHistoryVisible, setActionHistoryVisible] = useAtom(
+    actionHistoryVisibleAtom,
+  );
 
   // If a tab is active find the active tab index
   const activeTab = tabs.find((tab) => tab.active);
@@ -82,8 +86,52 @@ export const EditorTabs = ({
       <InteractiveLogicModal />
       <Tab.Group selectedIndex={selectedIndex}>
         <div className="flex flex-col">
+          {/* 操作时间轴控制栏 */}
+          <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2">
+            <button
+              onClick={() => setActionHistoryVisible(!actionHistoryVisible)}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              title={actionHistoryVisible ? "隐藏操作历史" : "显示操作历史"}
+            >
+              {actionHistoryVisible ? (
+                <>
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                  <span>隐藏历史</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                  <span>显示历史</span>
+                </>
+              )}
+            </button>
+          </div>
           {/* 操作时间轴 */}
-          <ActionTimeline />
+          {actionHistoryVisible && <ActionTimeline />}
 
           <div className="flex">
             <Tab.List className="ml-1 mt-3 flex h-8">

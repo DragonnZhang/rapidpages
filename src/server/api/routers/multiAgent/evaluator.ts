@@ -14,6 +14,7 @@ import { emitTestRunUpdate } from "./helpers";
 export async function evaluateTestCases(
   testCases: TestCase[],
   uiVersion: UiVersion,
+  testRunId: string,
 ): Promise<TestCaseResult[]> {
   const results: TestCaseResult[] = [];
 
@@ -32,7 +33,6 @@ export async function evaluateTestCases(
     console.log(`📝 [MultiAgent] Executing test case: ${tc.title}`);
 
     // Update status to running
-    const testRunId = tc.requirementId; // Use requirementId as testRunId for now
     const statusMap = testCaseStatusStore.get(testRunId);
     if (statusMap) {
       statusMap.set(tc.id, {
