@@ -1,41 +1,126 @@
 # Rapidpages – Copilot Instructions
 
-## System outline
+Rapidpages is an AI-powered IDE for generating React+Tailwind UI components from natural language. It features multi-agent testing loops, action recording, and in-browser compilation.
 
-- Next.js 13 "pages" app in `src/pages/**` with shared layouts in `src/components/AppLayout.tsx`; middleware redirects `/` to `/new`.
-- Data stack: NextAuth (GitHub OAuth) + Prisma/PostgreSQL (`prisma/schema.prisma`) with `Component` + `ComponentRevision` storing UI code as JSON `ComponentFile[]` blobs.
-- API layer is tRPC (`src/server/api/**`); routers are aggregated in `appRouter` and exposed client-side through `src/utils/api.ts` (React Query with superjson).
-- Server utilities live under `src/server`; `ssgHelper` wires SSR to tRPC + session, and `env.mjs` enforces typed environment variables.
+## Architecture Overview
 
-## AI + data flow
+**Stack**: Next.js 13 (Pages Router) + tRPC + Prisma (PostgreSQL) + NextAuth (GitHub OAuth)
 
-- Prompting happens through `RichTextInput`, which emits `{ text, media }`; `/new` calls `api.component.createComponent` and `/r/[id]` uses `makeRevision`.
-- `generateNewComponent` / `reviseComponent` (`src/server/openai.ts`) expect LLM replies formatted as `tsx // 文件: Name.tsx (主文件)` blocks; they merge back into `ComponentFile[]`. Preserve this contract when altering prompts or parsers.
-- `parseCodeToComponentFiles` normalizes DB payloads; always run responses through it before feeding renderers.
-- `PageEditor` compiles previews via `compileTypescript` (esbuild-wasm + Babel + in-browser Tailwind). Keep files flagged with `isMain` so the entrypoint renders the right component.
-- Action capture: iframe listeners push `ActionRecord`s into the Jotai store; `ActionTimeline` dispatches custom events (`actionSequenceDrop`) consumed by `RichTextInput`. Emit the same events if you add new capture sources.
-- Element selection mode in `PageEditor` fires `elementDrop` with HTML; `RichTextInput` turns these into badges. Maintain event payload shape `{ type, name, content }`.
+- **Pages**: `src/pages/**` routes with shared `AppLayout.tsx`; middleware redirects `/` → `/new`
+- **Data**: `Component` + `ComponentRevision` tables store UI as JSON `ComponentFile[]` arrays (format: `[{filename, content, isMain}]`)
+- **API**: tRPC routers in `src/server/api/routers/`, aggregated in `appRouter`, consumed via `api.*.useMutation()`
+- **Auth**: Session-based with `useSession({ required: true })` for protected pages
 
-## Frontend patterns
+## Core Data Flow: Prompt → UI → Preview
 
-- UI panes organized with `react-resizable-panels`, `EditorTabs`, `PagePanel` (iframe canvas), and `CodePanel` (read-only CodeMirror with drag-to-input support). Reuse the drag payload `{ type: "code", filename, content }`.
-- State management favors Jotai (`actionHistoryAtom`, `selectedActionIdsAtom`) plus local React state; avoid introducing Redux.
-- Toasts via `react-hot-toast`; navigation with Next router or `<Link>`. Auth-guarded views rely on `useSession({ required: true })` as seen in `my-uis.tsx`.
-- Table/list UIs use `@tanstack/react-table`; follow `my-uis.tsx` for pagination + flexRender conventions.
-- Tailwind is the styling baseline; `cn` (`src/utils/utils.ts`) wraps `clsx` + `tailwind-merge` to merge class names.
+1. **Input**: `RichTextInput` collects `{text, media}` where `media` can be images, code files, element HTML, action sequences, or interactive logic
+2. **Generation**:
+   - New: `api.component.createComponent` → `generateNewComponent()` (in `openai.ts`)
+   - Revision: `api.component.makeRevision` → `reviseComponent()`
+   - Both expect LLM responses like:
+     ````tsx
+     ```tsx // 文件: ComponentName.tsx (主文件)
+     // ...actual component code...
+     ```;
+     ````
+3. **Parsing**: `extractMultipleCodeBlocks()` → `ComponentFile[]`, normalized via `parseCodeToComponentFiles()` before DB writes or rendering
+4. **Compilation**: `PageEditor` runs `compileTypescript(files)`:
+   - Uses esbuild-wasm (CDN-loaded) + Babel + JIT Tailwind
+   - Requires exactly ONE file with `isMain: true` as entrypoint
+   - Returns standalone HTML with inlined CSS and UMD React imports
 
-## Environment & workflows
+## Multi-Agent Testing System (Branch: `002-multi-agent-ui-loop`)
 
-- Required env vars: DB + GitHub OAuth + multiple AI keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, etc.) plus `MODEL_NAME` and `NEXT_PUBLIC_URL`; validation fails early via `env.mjs`.
-- Local bootstrap: `npm install`, `npm run db:push` to sync Prisma, then `npm run dev`. Production build uses `npm run build:production` (runs `prisma migrate deploy` + `next build`).
-- Postinstall runs `prisma generate`; keep schema changes accompanied by migrations (`prisma migrate dev`).
-- Linting is the main check (`npm run lint`); there are no packaged unit tests yet.
-- `esbuild-wasm` loads from a CDN; offline environments need an alternate `wasmURL` before calling `compileTypescript`.
+**Goal**: Automated Evaluator-Optimizer loop for UI validation and iterative fixes
 
-## Tips & pitfalls
+- **Flow**: Requirement parsing → UI generation → Test case design → Test execution → Result analysis → UI optimization (up to 3 cycles)
+- **Key files**:
+  - `multiAgent.ts`: tRPC router + orchestrator
+  - `multiAgent/*.ts`: Individual agents (parser, generator, evaluator, etc.)
+  - `storage.ts`: In-memory stores + event emitter for real-time updates
+- **Type**: All agents share `TestRun`, `TestCase`, `UiVersion`, `IterationCycle` types
+- **Integration**: Uses MCP (Model Context Protocol) for browser automation via `api.mcp.*` procedures
 
-- Respect Prisma JSON columns when mutating components—send serialized arrays to the API, not raw strings.
-- When adding AI providers, extend `getModelByName` instead of branching elsewhere; it centralizes base URLs and API keys.
-- Preserve SSR hydration by registering new routers inside `appRouter` and exporting them through `src/server/api/routers/*`.
-- Custom events binding (`window.addEventListener`) require cleanup inside `useEffect` returns; follow existing patterns to avoid leaks.
-- Middleware already handles `/` redirect; avoid duplicating server redirects in page components.
+## Action Recording & Element Selection
+
+- **Recording**: `PageEditor` listens to iframe events (click, input, etc.) → creates `ActionRecord` → pushes to `actionHistoryAtom` (Jotai)
+- **Timeline**: `ActionTimeline` component displays records and dispatches:
+  - `actionSequenceDrop` event: When user drags action(s) to input
+  - `elementDrop` event: When selecting element in "selection mode"
+- **Consumption**: `RichTextInput` handles these events, converts to media badges, and includes in LLM prompts
+
+**Custom event payloads**:
+
+```typescript
+// For elements
+{ type: "element", name: string, content: string }
+
+// For action sequences
+{ actions: ActionRecord[], id: string }
+```
+
+## AI Provider Integration
+
+- **Centralized**: All LLM calls route through `getModelByName(env.MODEL_NAME)` in `utils.ts`
+- **Supported**: OpenAI, Anthropic, DeepSeek, Google Gemini, Qwen, Doubao
+- **Adding providers**: Extend `getModelByName()` with new AI SDK instances; do NOT scatter API key logic
+
+## Frontend Patterns
+
+- **Layout**: `react-resizable-panels` for split views; `EditorTabs` for multi-file code display
+- **State**: Jotai atoms (`actionHistoryAtom`, `interactiveLogicModalAtom`) + local React state; avoid Redux
+- **Drag/Drop**: CodePanel items are draggable with `{ type: "code", filename, content }` payload
+- **Styling**: Tailwind classes only; use `cn()` helper to merge conditional classes
+- **Tables**: `@tanstack/react-table` with `flexRender`; see `my-uis.tsx` for patterns
+
+## Development Workflows
+
+**Setup**:
+
+```bash
+npm install
+npm run db:push     # Sync Prisma schema without migrations
+npm run dev         # Start dev server on :3000
+```
+
+**Environment** (see `env.mjs` for validation):
+
+- DB: `DATABASE_URL` (PostgreSQL)
+- Auth: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `NEXTAUTH_SECRET`
+- AI: Keys for OpenAI, Anthropic, DeepSeek, Google, Qwen, Doubao
+- Config: `MODEL_NAME` (e.g., "deepseek-V3"), `MCP_SERVER_URL`, `NEXT_PUBLIC_URL`
+
+**Database changes**:
+
+```bash
+npx prisma migrate dev   # Create + apply migration
+npm run build:production # For deployments (runs migrate deploy)
+```
+
+**Quality**: `npm run lint` is the only automated check; no test suite yet
+
+## Critical Constraints & Pitfalls
+
+1. **Code format**: LLM responses MUST match `tsx // 文件: X.tsx (主文件)` exactly; regex parsing is fragile
+2. **DB JSON columns**: Always serialize `ComponentFile[]` before saving to `code` field
+3. **Main file**: Every `ComponentFile[]` needs exactly one `isMain: true` file for compilation
+4. **Event cleanup**: Custom event listeners in `useEffect` must return cleanup functions
+5. **SSR hydration**: New tRPC routers must export from `appRouter` and be imported in `_app.tsx` context
+6. **esbuild CDN**: Compilation breaks offline; test with `wasmURL` override if needed
+7. **Action recording**: Continuous input events are debounced; only final value creates new `ActionRecord`
+8. **Iteration limits**: Multi-agent loop caps at 3 cycles to prevent infinite retries
+
+## File Naming Conventions
+
+- Components: PascalCase (e.g., `PageEditor.tsx`)
+- Utils/Helpers: camelCase (e.g., `codeTransformer.ts`)
+- Types: Shared types live in `src/types/`, router-specific types co-locate with router
+- Routers: Noun-based (e.g., `component.ts`, `multiAgent.ts`), NOT verb-based
+
+## Useful Entry Points
+
+- **UI rendering**: [src/components/PageEditor.tsx](src/components/PageEditor.tsx) lines 48-200
+- **LLM prompts**: [src/server/openai.ts](src/server/openai.ts) system prompts around L190, L300
+- **Type defs**: [src/utils/compiler.ts](src/utils/compiler.ts#L46-L50) for `ComponentFile`, [src/types/multimodal.ts](src/types/multimodal.ts) for media types
+- **Multi-agent orchestration**: [src/server/api/routers/multiAgent/orchestrator.ts](src/server/api/routers/multiAgent/orchestrator.ts)
+- **DB schema**: [prisma/schema.prisma](prisma/schema.prisma)
