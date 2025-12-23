@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-midscene": {
       "command": "npx",
-      "args": ["-y", "@midscene/mcp"],
+      "args": ["-y", "@midscene/mcp@0.30.10"],
       "env": {
         "OPENAI_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "OPENAI_API_KEY": "sk-b0a2b248deff4568a0e83054ecb74565",
