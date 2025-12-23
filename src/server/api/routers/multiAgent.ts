@@ -58,7 +58,6 @@ import {
 import { parseRequirement } from "./multiAgent/requirementParser";
 import { generateInitialUi } from "./multiAgent/uiGenerator";
 import { generateTestCases } from "./multiAgent/testCaseGenerator";
-import { evaluateTestCases } from "./multiAgent/evaluator";
 
 // Import orchestrator and helpers
 import { runIterativeTestingLoop } from "./multiAgent/orchestrator";
